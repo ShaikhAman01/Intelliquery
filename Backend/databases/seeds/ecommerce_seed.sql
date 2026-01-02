@@ -1,4 +1,3 @@
--- Categories (5)
 INSERT INTO categories (name) VALUES 
 ('Electronics'),
 ('Clothing'),
@@ -6,7 +5,6 @@ INSERT INTO categories (name) VALUES
 ('Home'),
 ('Sports');
 
--- Users (10)
 INSERT INTO users (name, email, city) VALUES 
 ('Rahul Sharma', 'rahul@email.com', 'Mumbai'),
 ('Priya Singh', 'priya@email.com', 'Delhi'),
@@ -19,26 +17,24 @@ INSERT INTO users (name, email, city) VALUES
 ('Aditya Joshi', 'aditya@email.com', 'Delhi'),
 ('Ishita Verma', 'ishita@email.com', 'Mumbai');
 
--- Products (20) - Mix across categories
 INSERT INTO products (name, category_id, price, stock_quantity) VALUES 
--- Electronics
 ('iPhone 15', 1, 79999.00, 50),
 ('Samsung Galaxy S24', 1, 69999.00, 30),
 ('Sony Headphones', 1, 8999.00, 100),
 ('MacBook Pro', 1, 199999.00, 15),
--- Clothing
+
 ('Nike T-Shirt', 2, 1299.00, 200),
 ('Levi Jeans', 2, 2999.00, 150),
 ('Adidas Shoes', 2, 4999.00, 80),
--- Books
+
 ('Atomic Habits', 3, 499.00, 500),
 ('The Alchemist', 3, 299.00, 300),
 ('Rich Dad Poor Dad', 3, 399.00, 400),
--- Home
+
 ('Coffee Maker', 4, 3499.00, 60),
 ('Bed Sheet Set', 4, 1299.00, 120),
 ('Table Lamp', 4, 899.00, 90),
--- Sports
+
 ('Football', 5, 799.00, 100),
 ('Cricket Bat', 5, 2499.00, 50),
 ('Yoga Mat', 5, 699.00, 150),
@@ -47,7 +43,6 @@ INSERT INTO products (name, category_id, price, stock_quantity) VALUES
 ('Basketball', 5, 1299.00, 80),
 ('Swimming Goggles', 5, 599.00, 200);
 
--- Orders (15)
 INSERT INTO orders (user_id, product_id, quantity, total_amount, order_date) VALUES 
 (1, 1, 1, 79999.00, NOW() - INTERVAL '5 days'),
 (2, 5, 2, 2598.00, NOW() - INTERVAL '3 days'),
@@ -65,7 +60,6 @@ INSERT INTO orders (user_id, product_id, quantity, total_amount, order_date) VAL
 (4, 18, 1, 3999.00, NOW() - INTERVAL '9 days'),
 (5, 20, 2, 1198.00, NOW() - INTERVAL '14 days');
 
--- Reviews (20)
 INSERT INTO reviews (product_id, user_id, rating, comment) VALUES 
 (1, 1, 5, 'Excellent phone! Camera is amazing.'),
 (2, 6, 4, 'Good value for money.'),
