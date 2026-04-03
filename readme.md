@@ -1,5 +1,5 @@
 # IntelliQuery
-
+ 
 IntelliQuery is an AI-powered natural language interface for querying databases.
 Users can interact using plain English (text or voice), and the system returns data with visualizations and AI-generated insights.
 
