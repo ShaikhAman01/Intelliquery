@@ -22,6 +22,7 @@ import {
   Database,
   Plus,
   Loader2,
+  Zap,
 } from "lucide-react";
 import { useSession } from "@/lib/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,11 +36,14 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">
-            Loading Intelliquery...
+      <div className="flex h-[100dvh] w-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative flex items-center justify-center">
+            <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+            <Loader2 className="h-10 w-10 animate-spin text-primary relative z-10" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground animate-pulse tracking-wide uppercase">
+            Initializing Intelliquery
           </p>
         </div>
       </div>
@@ -56,25 +60,26 @@ export default function Dashboard() {
 function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col relative overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
+      {/* Sophisticated Background Effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
+      <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.02] mix-blend-overlay" />
 
       {/* Hero Section */}
-      <div className="relative z-10 flex-1 flex items-center justify-center p-6">
-        <div className="max-w-4xl w-full text-center space-y-8">
+      <div className="relative z-10 flex-1 flex items-center justify-center p-6 lg:p-12">
+        <div className="max-w-5xl w-full text-center space-y-10">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="space-y-4"
+            transition={{ duration: 0.7, ease: "easeOut" }}
+            className="space-y-6"
           >
-            <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center glow-cyan mx-auto shadow-xl border border-primary/20">
-              <Database className="w-10 h-10 text-primary" />
+            <div className="mx-auto w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/5 rounded-[2rem] flex items-center justify-center shadow-[0_0_40px_rgba(var(--primary),0.15)] border border-primary/20 backdrop-blur-xl">
+              <Database className="w-12 h-12 text-primary drop-shadow-md" />
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-foreground">
-              Welcome to <span className="text-primary">Intelliquery</span>
+            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tighter text-foreground">
+              Welcome to <span className="text-primary bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">Intelliquery</span>
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               Transform natural language into powerful SQL queries. Connect your
               databases and start exploring data with AI-powered intelligence.
             </p>
@@ -85,19 +90,20 @@ function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
             <Button
               size="lg"
-              className="w-full sm:w-auto gap-2 text-base h-12 px-8 gradient-btn text-white transition-all shadow-lg hover:scale-105 active:scale-95"
+              className="w-full sm:w-auto gap-2 text-base h-14 px-10 bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary),0.5)] transition-all duration-300 hover:-translate-y-1 rounded-full font-semibold"
               onClick={() => (window.location.href = "/sign-up")}
             >
               Get Started Free
+              <Sparkles className="w-5 h-5" />
             </Button>
             <Button
               variant="outline"
               size="lg"
-              className="w-full sm:w-auto gap-2 text-base h-12 px-8 border-primary/20 hover:bg-primary/5 transition-all"
+              className="w-full sm:w-auto gap-2 text-base h-14 px-10 border-border hover:bg-muted/50 transition-all duration-300 rounded-full font-medium"
               onClick={() => (window.location.href = "/sign-in")}
             >
               Sign In
@@ -109,34 +115,34 @@ function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16"
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20"
           >
-            <div className="p-6 rounded-xl bg-card border border-border shadow-sm hover:shadow-md transition-shadow">
-              <div className="bg-emerald-500/10 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
-                <Sparkles className="w-6 h-6 text-emerald-500" />
+            <div className="group p-8 rounded-3xl bg-card/40 backdrop-blur-sm border border-border/50 shadow-lg hover:shadow-xl hover:border-primary/30 transition-all duration-300">
+              <div className="bg-emerald-500/10 w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Sparkles className="w-7 h-7 text-emerald-500" />
               </div>
-              <h3 className="font-semibold text-lg mb-2">AI Powered</h3>
-              <p className="text-muted-foreground">
+              <h3 className="font-bold text-xl mb-3">AI Powered</h3>
+              <p className="text-muted-foreground leading-relaxed">
                 State-of-the-art AI models translate your natural language
                 queries into accurate, optimized SQL instantly.
               </p>
             </div>
-            <div className="p-6 rounded-xl bg-card border border-border shadow-sm hover:shadow-md transition-shadow">
-              <div className="bg-blue-500/10 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
-                <BarChart3 className="w-6 h-6 text-blue-500" />
+            <div className="group p-8 rounded-3xl bg-card/40 backdrop-blur-sm border border-border/50 shadow-lg hover:shadow-xl hover:border-primary/30 transition-all duration-300">
+              <div className="bg-blue-500/10 w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <BarChart3 className="w-7 h-7 text-blue-500" />
               </div>
-              <h3 className="font-semibold text-lg mb-2">Smart Visualizer</h3>
-              <p className="text-muted-foreground">
+              <h3 className="font-bold text-xl mb-3">Smart Visualizer</h3>
+              <p className="text-muted-foreground leading-relaxed">
                 Automatically visualize your query results with beautiful,
                 interactive charts and exportable graphics.
               </p>
             </div>
-            <div className="p-6 rounded-xl bg-card border border-border shadow-sm hover:shadow-md transition-shadow">
-              <div className="bg-purple-500/10 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
-                <Table className="w-6 h-6 text-purple-500" />
+            <div className="group p-8 rounded-3xl bg-card/40 backdrop-blur-sm border border-border/50 shadow-lg hover:shadow-xl hover:border-primary/30 transition-all duration-300">
+              <div className="bg-purple-500/10 w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Table className="w-7 h-7 text-purple-500" />
               </div>
-              <h3 className="font-semibold text-lg mb-2">Multi-Database</h3>
-              <p className="text-muted-foreground">
+              <h3 className="font-bold text-xl mb-3">Multi-Database</h3>
+              <p className="text-muted-foreground leading-relaxed">
                 Connect to PostgreSQL, MySQL, SQLite, and more. Query across
                 databases with unified intelligence.
               </p>
@@ -146,8 +152,11 @@ function LandingPage() {
       </div>
 
       {/* Footer */}
-      <div className="relative z-10 border-t border-border bg-card/50 backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto px-6 py-8 text-center">
+      <div className="relative z-10 border-t border-border/40 bg-background/50 backdrop-blur-md">
+        <div className="max-w-5xl mx-auto px-6 py-8 text-center flex justify-between items-center">
+          <div className="flex items-center gap-2 text-foreground font-semibold">
+            <Database className="w-5 h-5 text-primary" /> Intelliquery
+          </div>
           <p className="text-sm text-muted-foreground">
             © 2026 Intelliquery. All rights reserved.
           </p>
@@ -199,7 +208,7 @@ function DashboardContent() {
         params: { user_query: input, connection_id: activeConnectionId },
       });
 
-      const duration = Math.round(performance.now() - startTime); // ✅ FIXED
+      const duration = Math.round(performance.now() - startTime);
 
       setSql(res.data.sql || "");
       setData(res.data.data || []);
@@ -209,8 +218,7 @@ function DashboardContent() {
       );
       setQuerySource(res.data.query_source || "");
       setExecutionTime(res.data.execution_time_ms || 0);
-
-      setInsights(res.data.visualization || null); // ✅ FIXED
+      setInsights(res.data.visualization || null);
 
       toast(`Query executed successfully in ${duration}ms`, "success");
 
@@ -278,8 +286,7 @@ function DashboardContent() {
             );
             setQuerySource(res.data.query_source || "");
             setExecutionTime(res.data.execution_time_ms || 0);
-
-            setInsights(res.data.visualization || null); // ✅ FIXED
+            setInsights(res.data.visualization || null);
 
             if (res.data.data?.length > 0) setActiveTab("chart");
           })
@@ -300,9 +307,9 @@ function DashboardContent() {
   };
 
   return (
-    <div className="flex relative h-[100dvh] bg-background text-foreground overflow-hidden">
-      {/* Sidebar for database connections */}
-      <Sidebar className="hidden lg:flex w-64" />
+    <div className="flex relative h-[100dvh] bg-[#fcfcfc] dark:bg-background text-foreground overflow-hidden">
+      {/* Sidebar */}
+      <Sidebar className="hidden lg:flex w-72 border-r border-border/50 bg-card/30 backdrop-blur-xl" />
 
       <div className="flex-1 flex flex-col h-full min-w-0">
         <Header />
@@ -313,67 +320,52 @@ function DashboardContent() {
             animate={{ opacity: 1, scale: 1 }}
             className="flex-1 flex items-center justify-center p-6 h-full overflow-y-auto"
           >
-            <div className="max-w-md text-center space-y-6 flex flex-col items-center">
-              <div className="w-24 h-24 bg-primary/10 rounded-3xl flex items-center justify-center glow-cyan mb-4 shadow-xl border border-primary/20">
-                <Database className="w-12 h-12 text-primary" />
+            <div className="max-w-2xl w-full p-12 rounded-3xl border-2 border-dashed border-border/60 bg-card/20 backdrop-blur-sm text-center space-y-8 flex flex-col items-center">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
+                <div className="w-24 h-24 bg-card rounded-3xl flex items-center justify-center shadow-xl border border-border relative z-10">
+                  <Database className="w-10 h-10 text-primary" />
+                </div>
               </div>
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">
-                Welcome to Intelliquery
-              </h2>
-              <p className="text-muted-foreground text-base px-4">
-                Connect your first database to start generating intelligent SQL
-                queries instantly using plain English.
-              </p>
-              <div className="pt-4">
+              <div className="space-y-3">
+                <h2 className="text-3xl font-extrabold tracking-tight">
+                  Connect Your Workspace
+                </h2>
+                <p className="text-muted-foreground text-lg px-4 max-w-lg mx-auto">
+                  Add your first database connection to start generating intelligent SQL
+                  queries instantly.
+                </p>
+              </div>
+              
+              <div className="pt-2">
                 <AddConnectionDialog
                   trigger={
                     <Button
                       size="lg"
-                      className="w-full sm:w-auto gap-2 text-base h-12 px-8 gradient-btn text-white transition-all shadow-lg hover:scale-105 active:scale-95"
+                      className="gap-3 h-14 px-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_20px_rgba(var(--primary),0.2)] hover:shadow-[0_0_30px_rgba(var(--primary),0.4)] transition-all rounded-full font-semibold text-base"
                     >
                       <Plus className="h-5 w-5" />
-                      Connect Database
+                      Add Connection
                     </Button>
                   }
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-4 w-full mt-12 text-left">
-                <div className="p-4 rounded-xl bg-card border border-border shadow-sm">
-                  <div className="bg-emerald-500/10 w-8 h-8 rounded-lg flex items-center justify-center mb-3">
-                    <Sparkles className="w-4 h-4 text-emerald-500" />
-                  </div>
-                  <h3 className="font-semibold text-sm mb-1">AI Powered</h3>
-                  <p className="text-xs text-muted-foreground">
-                    State-of-the-art models translate user intent into accurate
-                    generic SQL.
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-card border border-border shadow-sm">
-                  <div className="bg-blue-500/10 w-8 h-8 rounded-lg flex items-center justify-center mb-3">
-                    <BarChart3 className="w-4 h-4 text-blue-500" />
-                  </div>
-                  <h3 className="font-semibold text-sm mb-1">Visualizer</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Instantly map your SQL results to beautiful, exportable
-                    charts.
-                  </p>
-                </div>
-              </div>
             </div>
           </motion.div>
         ) : (
-          <main className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden p-4 lg:p-6 gap-4 lg:gap-6">
+          <main className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden p-4 lg:p-6 gap-4 lg:gap-6 bg-muted/10">
             {/* Left Panel - Query Input + History toggle */}
             <motion.div
+              layout
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className="w-full lg:w-[400px] flex-shrink-0 flex flex-col gap-4 h-fit lg:h-full"
+              className="w-full lg:w-[420px] flex-shrink-0 flex flex-col gap-4 h-fit lg:h-full"
             >
               {/* Query Input card */}
-              <div
-                className={`bg-card rounded-xl p-4 lg:p-6 border border-border glow-border ${showHistory ? "flex-shrink-0" : "flex-1 lg:max-h-full"}`}
+              <motion.div
+                layout
+                className={`bg-card rounded-2xl p-5 lg:p-6 border border-border/60 shadow-sm transition-all ${showHistory ? "flex-shrink-0" : "flex-1 lg:max-h-full"}`}
               >
                 <QueryInput
                   value={input}
@@ -383,58 +375,56 @@ function DashboardContent() {
                   isLoading={isLoading}
                   disabled={!activeConnectionId}
                 />
-              </div>
+              </motion.div>
 
               {/* Context indicator + History toggle */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Follow-up button */}
+              <motion.div layout className="flex items-center gap-2 flex-wrap px-1">
                 {data.length > 0 && (
                   <button
                     onClick={handleFollowUp}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg
-                             bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-all border border-primary/10"
                   >
                     <MessageSquarePlus className="h-3.5 w-3.5" />
-                    Ask follow-up
+                    Follow-up
                   </button>
                 )}
 
-                {/* Execution badge */}
                 {querySource && (
                   <span
-                    className={`text-[10px] px-2 py-1 rounded-full font-medium ${
+                    className={`flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full font-semibold shadow-sm ${
                       querySource === "DYNAMIC"
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : "bg-violet-500/10 text-violet-400 border border-violet-500/20"
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                        : "bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20"
                     }`}
                   >
-                    {querySource === "DYNAMIC" ? "⚡" : "🤖"} {querySource}
-                    {executionTime > 0 && ` · ${executionTime}ms`}
+                    {querySource === "DYNAMIC" ? <Zap className="w-3 h-3"/> : <Sparkles className="w-3 h-3"/>}
+                    {querySource}
+                    {executionTime > 0 && <span className="opacity-70 font-medium ml-1">· {executionTime}ms</span>}
                   </span>
                 )}
 
-                {/* History toggle */}
                 <button
                   onClick={() => setShowHistory(!showHistory)}
-                  className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                  className={`ml-auto flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-full transition-all border ${
                     showHistory
-                      ? "bg-primary/20 text-primary"
-                      : "bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      ? "bg-primary text-primary-foreground border-primary shadow-md"
+                      : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
                   }`}
                 >
-                  <Clock className="h-3.5 w-3.5" />
+                  <Clock className={`h-3.5 w-3.5 ${showHistory ? "animate-pulse" : ""}`} />
                   History
                 </button>
-              </div>
+              </motion.div>
 
               {/* History panel (expandable) */}
               <AnimatePresence>
                 {showHistory && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                    animate={{ opacity: 1, height: "auto", marginTop: 0 }}
-                    exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                    className="flex-shrink-0 lg:flex-1 min-h-[300px] bg-card rounded-xl border border-border overflow-hidden"
+                    initial={{ opacity: 0, height: 0, y: -10 }}
+                    animate={{ opacity: 1, height: "auto", y: 0 }}
+                    exit={{ opacity: 0, height: 0, y: -10 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="flex-shrink-0 lg:flex-1 min-h-[300px] bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden"
                   >
                     <div className="h-full p-4 overflow-hidden flex flex-col">
                       <HistoryPanel
@@ -449,25 +439,25 @@ function DashboardContent() {
 
             {/* Right Panel - SQL & Results */}
             <motion.div
+              layout
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.4, delay: 0.2 }}
               className="flex-1 flex flex-col gap-4 lg:gap-6 min-w-0 min-h-[600px] lg:min-h-0"
             >
               {/* SQL Display */}
-              <div className="h-[280px] flex-shrink-0 bg-card rounded-xl p-6 border border-border">
+              <div className="h-[280px] flex-shrink-0 bg-card rounded-2xl p-6 border border-border/60 shadow-sm">
                 {isLoading ? (
-                  <div className="flex flex-col gap-4 h-full pt-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Skeleton className="h-5 w-5 rounded-md" />
-                      <Skeleton className="h-4 w-32" />
+                  <div className="flex flex-col gap-4 h-full pt-2 animate-pulse">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Skeleton className="h-6 w-6 rounded-md bg-muted-foreground/20" />
+                      <Skeleton className="h-5 w-40 bg-muted-foreground/10" />
                     </div>
-                    <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-4 w-3/4 delay-75" />
-                    <Skeleton className="h-4 w-2/3 delay-150" />
-                    <Skeleton className="h-4 w-1/3 delay-200" />
-                    <div className="mt-auto flex justify-end">
-                      <Skeleton className="h-8 w-24 rounded-lg" />
+                    <div className="space-y-3 mt-4">
+                      <Skeleton className="h-4 w-1/2 bg-muted-foreground/10" />
+                      <Skeleton className="h-4 w-3/4 bg-muted-foreground/10" />
+                      <Skeleton className="h-4 w-2/3 bg-muted-foreground/10" />
+                      <Skeleton className="h-4 w-1/3 bg-muted-foreground/10" />
                     </div>
                   </div>
                 ) : (
@@ -479,16 +469,15 @@ function DashboardContent() {
               <AnimatePresence>
                 {error && (
                   <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    initial={{ opacity: 0, y: -10, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                    className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3"
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    className="flex items-start gap-3 bg-destructive/10 border border-destructive/20 rounded-xl px-5 py-4 shadow-sm"
                   >
-                    <span className="text-red-400 text-sm flex-1">{error}</span>
+                    <span className="text-destructive font-medium text-sm flex-1">{error}</span>
                     <button
                       onClick={() => setError("")}
-                      className="text-red-400/60 hover:text-red-400 text-xs"
+                      className="text-destructive/60 hover:text-destructive transition-colors text-sm font-bold bg-destructive/10 rounded-full w-6 h-6 flex items-center justify-center"
                     >
                       ✕
                     </button>
@@ -497,64 +486,63 @@ function DashboardContent() {
               </AnimatePresence>
 
               {/* Results / Chart / Insights Tabs */}
-              <div className="flex-1 bg-card rounded-xl border border-border overflow-hidden">
+              <div className="flex-1 bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden flex flex-col">
                 <Tabs
                   value={activeTab}
                   onValueChange={setActiveTab}
                   className="h-full flex flex-col"
                 >
-                  <div className="px-6 pt-4 border-b border-border">
-                    <TabsList className="bg-muted/50">
+                  <div className="px-6 pt-4 border-b border-border/50 bg-muted/20">
+                    <TabsList className="bg-transparent h-12 p-0 gap-6">
                       <TabsTrigger
                         value="chart"
-                        className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary gap-2"
+                        className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-2 py-3 gap-2 font-semibold text-muted-foreground transition-all"
                       >
                         <BarChart3 className="h-4 w-4" />
                         Chart
                       </TabsTrigger>
                       <TabsTrigger
                         value="results"
-                        className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary gap-2"
+                        className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-2 py-3 gap-2 font-semibold text-muted-foreground transition-all"
                       >
                         <Table className="h-4 w-4" />
-                        Results
+                        Data Grid
                       </TabsTrigger>
                       <TabsTrigger
                         value="insights"
-                        className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary gap-2"
+                        className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none px-2 py-3 gap-2 font-semibold text-muted-foreground transition-all"
                       >
                         <Sparkles className="h-4 w-4" />
-                        Insights
+                        AI Insights
                       </TabsTrigger>
                     </TabsList>
                   </div>
 
-                  <div className="flex-1 p-6 overflow-hidden">
+                  <div className="flex-1 p-6 overflow-hidden bg-card">
                     {isLoading ? (
-                      <div className="h-full flex flex-col gap-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Skeleton className="h-8 w-8 rounded-md" />
-                          <Skeleton className="h-8 w-8 rounded-md" />
-                          <Skeleton className="h-8 w-8 rounded-md" />
-                          <div className="ml-auto flex gap-2">
-                            <Skeleton className="h-8 w-24 rounded-md" />
-                            <Skeleton className="h-8 w-20 rounded-md" />
+                      <div className="h-full flex flex-col gap-6 animate-pulse">
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="h-10 w-10 rounded-xl bg-muted-foreground/10" />
+                          <Skeleton className="h-10 w-10 rounded-xl bg-muted-foreground/10" />
+                          <Skeleton className="h-10 w-10 rounded-xl bg-muted-foreground/10" />
+                          <div className="ml-auto flex gap-3">
+                            <Skeleton className="h-10 w-28 rounded-xl bg-muted-foreground/10" />
                           </div>
                         </div>
-                        <Skeleton className="flex-1 w-full rounded-xl" />
+                        <Skeleton className="flex-1 w-full rounded-2xl bg-muted-foreground/5 border border-border/50" />
                       </div>
                     ) : (
                       <>
-                        <TabsContent value="chart" className="h-full m-0">
+                        <TabsContent value="chart" className="h-full m-0 outline-none">
                           <ChartPanel
                             data={data}
                             chartRecommendation={chartRec}
                           />
                         </TabsContent>
-                        <TabsContent value="results" className="h-full m-0">
+                        <TabsContent value="results" className="h-full m-0 outline-none">
                           <ResultsPanel data={data} />
                         </TabsContent>
-                        <TabsContent value="insights" className="h-full m-0">
+                        <TabsContent value="insights" className="h-full m-0 outline-none">
                           <InsightsPanel
                             data={data}
                             explanation={explanation}
@@ -571,17 +559,18 @@ function DashboardContent() {
         )}
       </div>
 
-      {/* Connection Status - subtle banner instead of blocking overlay */}
+      {/* Connection Status Banner */}
       <AnimatePresence>
-        {!activeConnectionId && (
+        {!activeConnectionId && connections.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-20 left-1/2 -translate-x-1/2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-2 z-50 shadow-lg backdrop-blur-sm"
+            className="absolute top-6 left-1/2 -translate-x-1/2 bg-amber-500/10 border border-amber-500/30 rounded-full px-5 py-2.5 z-50 shadow-lg backdrop-blur-md flex items-center gap-2"
           >
-            <p className="text-amber-500 dark:text-amber-400 text-sm font-medium">
-              💡 Connect a database from the sidebar to start generating queries
+            <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            <p className="text-amber-600 dark:text-amber-400 text-sm font-semibold tracking-wide">
+              Select a database from the sidebar to begin
             </p>
           </motion.div>
         )}
