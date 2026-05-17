@@ -1,30 +1,27 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
-import os
-
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Intelliquery"
     API_V1_STR: str = "/api/v1"
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
-    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
+    
+    # Let Pydantic automatically look for these inside your .env file
+    DATABASE_URL: str
+    ENCRYPTION_KEY: str
 
     # LLM Providers
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
+    OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: Optional[str] = None
 
     # LLM fallback order (comma-separated): openai,gemini
-    LLM_FALLBACK_ORDER: str = os.getenv("LLM_FALLBACK_ORDER", "openai,gemini")
+    LLM_FALLBACK_ORDER: str = "openai,gemini"
 
     # Voice / Whisper
-    WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "whisper-1")
+    WHISPER_MODEL: str = "whisper-1"
 
     class Config:
         env_file = ".env"
+        env_file_encoding = "utf-8"
         extra = "ignore"
 
-
 settings = Settings()
-
-if not settings.DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is not set")
