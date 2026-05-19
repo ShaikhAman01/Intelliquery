@@ -10,7 +10,6 @@ interface VoiceInputProps {
     disabled?: boolean;
 }
 
-// Check if Web Speech API is available
 const hasWebSpeechAPI = () =>
     typeof window !== 'undefined' &&
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
@@ -21,19 +20,16 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
     const [mode, setMode] = useState<'idle' | 'recording' | 'processing'>('idle');
     const [error, setError] = useState<string | null>(null);
 
-    // Refs for cleanup
     const recognitionRef = useRef<any>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const streamRef = useRef<MediaStream | null>(null);
     const fellBackToWhisperRef = useRef(false);
 
-    // Waveform animation bars
     const [waveformBars, setWaveformBars] = useState<number[]>([0.3, 0.5, 0.7, 0.5, 0.3]);
     const animFrameRef = useRef<number | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
 
-    // Animate waveform from real audio data
     const animateWaveform = useCallback(() => {
         if (!analyserRef.current) return;
         const analyser = analyserRef.current;
@@ -53,7 +49,6 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
         update();
     }, []);
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -64,7 +59,7 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
         };
     }, []);
 
-    // ── Web Speech API approach ───────────────────────────────────────────
+    // Web Speech API
     const startWebSpeech = useCallback(() => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
@@ -86,7 +81,6 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
             const err = event.error;
             console.warn('Web Speech API error:', err);
 
-            // Kill the recognition instance so onend doesn't double-fire
             recognitionRef.current = null;
             try { recognition.abort(); } catch { }
 
@@ -97,12 +91,10 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
             }
 
             if (err === 'no-speech' || err === 'aborted') {
-                // User didn't speak or manually stopped — not a real error
                 cleanup();
                 return;
             }
 
-            // 'network' or 'service-not-allowed' → fall back to Whisper
             if (!fellBackToWhisperRef.current) {
                 fellBackToWhisperRef.current = true;
                 console.info('Falling back to Whisper API for transcription');
@@ -118,7 +110,7 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
             if (transcript.trim()) {
                 onTranscript(transcript.trim());
             }
-            // Only cleanup if we didn't fall back to Whisper
+    
             if (!fellBackToWhisperRef.current) {
                 cleanup();
             }
@@ -128,7 +120,7 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
         recognitionRef.current = recognition;
     }, [onTranscript]);
 
-    // ── Whisper fallback (MediaRecorder → backend) ────────────────────────
+    // Whisper fallback
     const startWhisperRecording = useCallback(async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -171,7 +163,7 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
                 }
             };
 
-            mediaRecorder.start(250); // collect in 250ms chunks
+            mediaRecorder.start(250);
             mediaRecorderRef.current = mediaRecorder;
         } catch (err: any) {
             console.error('Mic access error:', err);
@@ -180,7 +172,6 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
         }
     }, [onTranscript, animateWaveform]);
 
-    // ── Start / Stop ──────────────────────────────────────────────────────
     const startRecording = useCallback(async () => {
         setError(null);
         setIsRecording(true);
@@ -188,7 +179,6 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
         fellBackToWhisperRef.current = false;
 
         if (hasWebSpeechAPI()) {
-            // Still need mic stream for waveform visualization
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 streamRef.current = stream;
@@ -220,7 +210,6 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
             mediaRecorderRef.current = null;
         }
 
-        // Cleanup stream and animation
         if (animFrameRef.current) {
             cancelAnimationFrame(animFrameRef.current);
             animFrameRef.current = null;
@@ -256,7 +245,6 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
 
     return (
         <div className="flex items-center gap-2">
-            {/* Waveform visualization - shown while recording */}
             {isRecording && (
                 <div className="voice-waveform flex items-center gap-[3px] h-6">
                     {waveformBars.map((height, i) => (
@@ -272,29 +260,26 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
                 </div>
             )}
 
-            {/* Processing indicator */}
             {isProcessing && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <span className="flex items-center gap-1 text-xs text-[#c2c6d7]">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     Transcribing...
                 </span>
             )}
 
-            {/* Error message */}
             {error && (
-                <span className="text-xs text-red-400">{error}</span>
+                <span className="text-xs text-[#ffb4ab]">{error}</span>
             )}
 
-            {/* Mic button */}
             <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 onClick={handleClick}
                 disabled={disabled || isProcessing}
-                className={`relative h-8 w-8 rounded-full transition-all duration-300 ${isRecording
-                    ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20 voice-recording-pulse'
-                    : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
+                className={`relative h-10 w-10 rounded-2xl border border-white/10 transition-all duration-300 ${isRecording
+                    ? 'bg-red-500/10 text-[#ffb4ab] hover:bg-red-500/20 voice-recording-pulse'
+                    : 'bg-[#353437]/50 text-[#c2c6d7] hover:bg-[#afc6ff]/15 hover:text-[#afc6ff]'
                     }`}
                 title={isRecording ? 'Stop recording' : 'Voice input'}
             >

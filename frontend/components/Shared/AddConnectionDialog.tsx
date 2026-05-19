@@ -78,12 +78,12 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button variant="outline" className="w-full justify-start gap-3 mt-4 border-dashed text-muted-foreground hover:text-foreground">
+          <Button variant="outline" className="mt-4 h-12 w-full justify-center gap-3 rounded-xl border-white/10 bg-transparent text-[#c2c6d7] hover:bg-white/[0.04] hover:text-[#e5e1e4]">
             <Plus size={16} /> Add Connection
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="border-white/10 bg-[#1c1b1d] text-[#e5e1e4] sm:max-w-[425px]">
         <DialogHeader><DialogTitle>Connect Database</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="space-y-2 border-b border-border pb-4">

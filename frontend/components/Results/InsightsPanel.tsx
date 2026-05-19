@@ -64,7 +64,7 @@ export const InsightsPanel = ({
       </div>
 
       {/* Key Patterns */}
-      {insightsData.key_patterns?.length > 0 && (
+      {(insightsData.key_patterns?.length ?? 0) > 0 && (
         <div className="bg-card rounded-lg p-4 border border-border">
           <h3 className="font-medium text-foreground mb-2">Key Patterns</h3>
           <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
@@ -76,7 +76,7 @@ export const InsightsPanel = ({
       )}
 
       {/* Anomalies */}
-      {insightsData.anomalies?.length > 0 && (
+      {(insightsData.anomalies?.length ?? 0) > 0 && (
         <div className="bg-card rounded-lg p-4 border border-border">
           <h3 className="font-medium text-foreground mb-2">Anomalies</h3>
           <ul className="text-sm text-red-400 list-disc pl-5 space-y-1">
@@ -88,7 +88,7 @@ export const InsightsPanel = ({
       )}
 
       {/* Recommendations */}
-      {insightsData.recommendations?.length > 0 && (
+      {(insightsData.recommendations?.length ?? 0) > 0 && (
         <div className="bg-card rounded-lg p-4 border border-border">
           <h3 className="font-medium text-foreground mb-2">Recommendations</h3>
           <ul className="text-sm text-green-400 list-disc pl-5 space-y-1">

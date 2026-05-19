@@ -1,7 +1,6 @@
 'use client';
 
-import { Sparkles, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ArrowUp, Sparkles, TrendingUp, Users, TriangleAlert } from 'lucide-react';
 import { VoiceInput } from '@/components/Query/VoiceInput';
 
 interface QueryInputProps {
@@ -14,10 +13,9 @@ interface QueryInputProps {
 }
 
 const templates = [
-  { label: 'Top Customers', query: 'Show me top 10 customers by total spent' },
-  { label: 'Sales by Region', query: 'Show sales breakdown by region for last month' },
-  { label: 'User Growth', query: 'Show monthly user growth over the past year' },
-  { label: 'Product Analytics', query: 'Show top performing products by revenue' },
+  { label: 'Show monthly revenue trends', query: 'Show monthly revenue trends', icon: TrendingUp, color: 'text-[#4edea3]' },
+  { label: 'Identify top customers by LTV', query: 'Identify top customers by LTV', icon: Users, color: 'text-[#afc6ff]' },
+  { label: 'Find churn anomalies in Q3', query: 'Find churn anomalies in Q3', icon: TriangleAlert, color: 'text-[#d0bcff]' },
 ];
 
 export const QueryInput = ({
@@ -35,71 +33,48 @@ export const QueryInput = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold text-foreground">Describe Your Query</h2>
-        </div>
-        <VoiceInput onTranscript={handleTranscript} disabled={disabled || isLoading} />
-      </div>
-
-      {/* Input Area */}
-      <div className="flex-1 flex flex-col gap-4">
-        <div className="relative flex-1 min-h-[120px]">
+    <div className="mx-auto w-full max-w-[960px]">
+      <div className="glass-panel ai-glow-focus relative overflow-hidden rounded-[28px] p-2">
+        <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-r from-[#afc6ff]/5 to-[#d0bcff]/5" />
+        <div className="relative z-10 flex min-h-[108px] items-start gap-4 p-4 md:min-h-[124px]">
+          <Sparkles className="mt-1 h-7 w-7 shrink-0 text-[#afc6ff]" fill="currentColor" />
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="e.g., Show me top customers by revenue... or click the mic to speak"
-            className="w-full h-full resize-none bg-card border border-border rounded-lg p-4 
-                       text-foreground placeholder:text-muted-foreground 
-                       focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50
-                       transition-all duration-200"
+            placeholder="Ask Intelliquery a question about inscribe_prod..."
+            className="min-h-[76px] flex-1 resize-none border-0 bg-transparent p-0 pt-1 text-xl font-semibold leading-snug tracking-tight text-[#e5e1e4] outline-none placeholder:text-[#8c90a0]/60 focus:ring-0 md:text-2xl"
             disabled={disabled || isLoading}
           />
+          <div className="flex shrink-0 items-center gap-2">
+            <VoiceInput onTranscript={handleTranscript} disabled={disabled || isLoading} />
+            <button
+              onClick={onSubmit}
+              disabled={disabled || isLoading || !value.trim()}
+              className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-[#353437]/70 text-[#e5e1e4] transition-all hover:bg-[#afc6ff] hover:text-[#002d6d] disabled:cursor-not-allowed disabled:opacity-45"
+              title="Execute query"
+            >
+              {isLoading ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+              ) : (
+                <ArrowUp className="h-5 w-5" />
+              )}
+            </button>
+          </div>
         </div>
-
-        {/* Generate Button */}
-        <Button
-          onClick={onSubmit}
-          disabled={disabled || isLoading || !value.trim()}
-          className="w-full h-12 gradient-btn text-white font-medium text-base rounded-lg
-                     disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-              Generating...
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              Generate SQL
-              <ArrowRight className="h-4 w-4" />
-            </span>
-          )}
-        </Button>
       </div>
 
-      {/* Quick Templates */}
-      <div className="mt-6">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          Quick Templates
-        </h3>
-        <div className="grid grid-cols-2 gap-2">
-          {templates.map((t) => (
-            <button
-              key={t.label}
-              onClick={() => onTemplateClick(t.query)}
-              disabled={disabled || isLoading}
-              className="template-btn px-3 py-2 rounded-lg text-sm text-muted-foreground 
-                         hover:text-foreground text-left transition-all duration-200
-                         disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+      <div className="mt-5 flex flex-wrap justify-center gap-3">
+        {templates.map(({ label, query, icon: Icon, color }) => (
+          <button
+            key={label}
+            onClick={() => onTemplateClick(query)}
+            disabled={disabled || isLoading}
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-[#353437]/75 px-4 py-2 font-mono text-xs font-medium tracking-wide text-[#e5e1e4] transition-colors hover:bg-[#424754]/80 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Icon className={`h-4 w-4 ${color}`} />
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   );
