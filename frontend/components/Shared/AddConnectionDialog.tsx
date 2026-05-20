@@ -46,9 +46,18 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
           }));
         }
       }
-    } catch (err) {
+    } catch {
       // ignore invalid URLs while typing
     }
+  };
+
+  const getErrorMessage = (err: unknown) => {
+    if (err instanceof Error) return err.message;
+    if (typeof err === 'object' && err !== null) {
+      const response = (err as { response?: { data?: { detail?: unknown } } }).response;
+      if (typeof response?.data?.detail === 'string') return response.data.detail;
+    }
+    return 'Unknown error';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,8 +72,8 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
         });
         setOpen(false);
       }
-    } catch (err: any) {
-      alert("Failed: " + (err.response?.data?.detail || err.message));
+    } catch (err: unknown) {
+      alert("Failed: " + getErrorMessage(err));
     } finally {
       setLoading(false);
     }

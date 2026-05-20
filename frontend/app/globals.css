@@ -48,30 +48,30 @@
 
 :root {
   --radius: 0.75rem;
-  --background: #131315;
+  --background: #0b0b0c;
   --foreground: #e5e1e4;
-  --card: #201f22;
+  --card: #121214;
   --card-foreground: #e5e1e4;
   --popover: #1c1b1d;
   --popover-foreground: #e5e1e4;
-  --primary: #afc6ff;
-  --primary-foreground: #002d6d;
+  --primary: #d9e2ff;
+  --primary-foreground: #152f5e;
   --secondary: #d0bcff;
   --secondary-foreground: #23005c;
-  --muted: #2a2a2c;
-  --muted-foreground: #c2c6d7;
-  --accent: #353437;
+  --muted: #1a1a1c;
+  --muted-foreground: #c4c6d0;
+  --accent: #2a2a2e;
   --accent-foreground: #e5e1e4;
   --destructive: #ffb4ab;
   --border: rgba(255, 255, 255, 0.1);
   --input: rgba(255, 255, 255, 0.1);
-  --ring: #afc6ff;
-  --chart-1: #afc6ff;
+  --ring: #8b5cf6;
+  --chart-1: #d9e2ff;
   --chart-2: #10b981;
   --chart-3: #f59e0b;
   --chart-4: #8b5cf6;
   --chart-5: #ffb4ab;
-  --sidebar: #0e0e10;
+  --sidebar: #0b0b0c;
   --sidebar-foreground: #e5e1e4;
   --sidebar-primary: #afc6ff;
   --sidebar-primary-foreground: #002d6d;
@@ -83,30 +83,30 @@
 
 .dark {
   --radius: 0.75rem;
-  --background: #131315;
+  --background: #0b0b0c;
   --foreground: #e5e1e4;
-  --card: #201f22;
+  --card: #121214;
   --card-foreground: #e5e1e4;
   --popover: #1c1b1d;
   --popover-foreground: #e5e1e4;
-  --primary: #afc6ff;
-  --primary-foreground: #002d6d;
+  --primary: #d9e2ff;
+  --primary-foreground: #152f5e;
   --secondary: #d0bcff;
   --secondary-foreground: #23005c;
-  --muted: #2a2a2c;
+  --muted: #1a1a1c;
   --muted-foreground: #c2c6d7;
-  --accent: #353437;
+  --accent: #2a2a2e;
   --accent-foreground: #e5e1e4;
   --destructive: #ffb4ab;
   --border: rgba(255, 255, 255, 0.1);
   --input: rgba(255, 255, 255, 0.1);
-  --ring: #afc6ff;
-  --chart-1: #afc6ff;
+  --ring: #8b5cf6;
+  --chart-1: #d9e2ff;
   --chart-2: #4edea3;
   --chart-3: #f59e0b;
   --chart-4: #d0bcff;
   --chart-5: #ffb4ab;
-  --sidebar: #0e0e10;
+  --sidebar: #0b0b0c;
   --sidebar-foreground: #e5e1e4;
   --sidebar-primary: #afc6ff;
   --sidebar-primary-foreground: #002d6d;
@@ -119,7 +119,7 @@
 html,
 body {
   min-height: 100%;
-  background: #0d0d0f;
+  background: #0b0b0c;
 }
 
 body {
@@ -215,6 +215,12 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.code-block {
+  background: #0b0b0c;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 .dark .code-display {
   background: rgba(14, 14, 16, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -268,9 +274,10 @@ body {
 }
 
 .glass-panel {
-  background: rgba(15, 23, 42, 0.58);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
+  background: linear-gradient(180deg, rgba(18, 18, 20, 0.82) 0%, rgba(11, 11, 12, 0.92) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02), 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(24px);
 }
 
 .surface-panel {
@@ -283,9 +290,80 @@ body {
 }
 
 .ai-glow-focus:focus-within {
-  border-color: rgba(175, 198, 255, 0.42);
-  box-shadow: 0 0 42px -10px rgba(87, 27, 193, 0.55), 0 0 24px -8px rgba(175, 198, 255, 0.36);
-  transform: scale(1.005);
+  border-color: rgba(139, 92, 246, 0.3);
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: scale(1.01);
+}
+
+.ai-input-container {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(24px);
+  transition: background 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ai-input-container:focus-within {
+  background: rgba(139, 92, 246, 0.02);
+  border-color: rgba(139, 92, 246, 0.3);
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: scale(1.01);
+}
+
+.generate-btn {
+  background: rgba(217, 226, 255, 0.05);
+  color: #d9e2ff;
+  border: 1px solid rgba(217, 226, 255, 0.1);
+  transition: transform 0.25s ease, background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.generate-btn:hover {
+  background: rgba(217, 226, 255, 0.1);
+  border-color: rgba(217, 226, 255, 0.2);
+  box-shadow: 0 0 15px -5px rgba(217, 226, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.premium-card {
+  background: linear-gradient(180deg, #1a1a1c 0%, #121214 100%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+.premium-card:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: translateY(-2px);
+}
+
+.nav-item {
+  position: relative;
+}
+
+.nav-item.active {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.035), transparent);
+}
+
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: #d9e2ff;
+}
+
+.ai-typing::after {
+  content: "|";
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 @keyframes pulse-glow {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area,
   PieChart, Pie, Cell,
@@ -16,18 +16,31 @@ import { motion, AnimatePresence } from 'motion/react';
 
 // ── Color palette (dark-theme friendly) ─────────────────────────────────
 const CHART_COLORS = [
-  '#6366f1', '#8b5cf6', '#a78bfa', '#c084fc',
-  '#38bdf8', '#22d3ee', '#2dd4bf', '#34d399',
-  '#fbbf24', '#f97316', '#fb7185', '#f472b6',
+  '#afc6ff', '#d0bcff', '#4edea3', '#7dd3fc',
+  '#fbbf24', '#fb7185', '#a78bfa', '#34d399',
+  '#f97316', '#22d3ee', '#f472b6', '#c084fc',
 ];
 
-const GRID_COLOR = 'rgba(148, 163, 184, 0.08)';
-const AXIS_COLOR = '#64748b';
-const TOOLTIP_BG = '#1e293b';
-const TOOLTIP_BORDER = '#334155';
+const GRID_COLOR = 'rgba(194, 198, 215, 0.12)';
+const AXIS_COLOR = '#a8adbd';
+const TOOLTIP_BG = '#1c1b1d';
+const TOOLTIP_BORDER = 'rgba(255, 255, 255, 0.14)';
 
 // ── Types ───────────────────────────────────────────────────────────────
 type ChartType = 'bar' | 'line' | 'pie' | 'kpi' | 'area' | 'table';
+type ChartRow = Record<string, unknown>;
+
+interface TooltipEntry {
+  color?: string;
+  name?: string;
+  value?: unknown;
+}
+
+interface TooltipProps {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  label?: unknown;
+}
 
 interface ChartPanelProps {
   data: Record<string, unknown>[];
@@ -45,21 +58,27 @@ const CHART_TYPE_OPTIONS: { type: ChartType; icon: React.ElementType; label: str
 ];
 
 // ── Tooltip (shared) ────────────────────────────────────────────────────
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border px-3 py-2 text-xs shadow-xl min-w-[120px]"
-      style={{ background: TOOLTIP_BG, borderColor: TOOLTIP_BORDER }}>
-      <p className="font-medium text-slate-300 mb-1">{label}</p>
-      {payload.map((entry: any, i: number) => (
-        <p key={i} className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ background: entry.color }} />
-          <span className="text-slate-400 truncate max-w-[150px]">{entry.name}:</span>
-          <span className="font-medium text-slate-200 ml-auto">
-            {typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
-          </span>
-        </p>
-      ))}
+    <div 
+      className="rounded-lg border px-3 py-2.5 text-xs shadow-xl backdrop-blur-sm min-w-[140px] border-white/[0.08]"
+      style={{ background: 'rgba(28, 27, 29, 0.94)' }}
+    >
+      <p className="font-mono font-semibold text-slate-400 mb-1.5 border-b border-white/[0.06] pb-1">
+        {String(label ?? '')}
+      </p>
+      <div className="space-y-1">
+        {payload.map((entry, i: number) => (
+          <p key={i} className="flex items-center gap-3">
+            <span className="h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ background: entry.color }} />
+            <span className="text-slate-400 font-medium truncate max-w-[140px]">{entry.name ?? 'Value'}:</span>
+            <span className="font-mono font-bold text-slate-100 ml-auto">
+              {typeof entry.value === 'number' ? entry.value.toLocaleString() : String(entry.value ?? '')}
+            </span>
+          </p>
+        ))}
+      </div>
     </div>
   );
 };
@@ -75,14 +94,6 @@ export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
   const [sortKey, setSortKey] = useState<string>('none');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [limit, setLimit] = useState<string>('50');
-
-  // Reset state when data changes
-  useEffect(() => {
-    setSortKey('none');
-    setSortDir('desc');
-    setLimit('50');
-    setChartType(chartRecommendation?.chart_type || 'bar');
-  }, [data, chartRecommendation]);
 
   // Derive keys
   const { keys, xKey, numericKeys } = useMemo(() => {
@@ -148,6 +159,11 @@ export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
     URL.revokeObjectURL(url);
   }, [processedData]);
 
+  const chartCanvasWidth = useMemo(() => {
+    if (chartType === 'pie' || chartType === 'kpi' || chartType === 'table') return '100%';
+    return Math.max(680, processedData.length * 64);
+  }, [chartType, processedData.length]);
+
   // Export PNG
   const exportPNG = useCallback(() => {
     const svg = containerRef.current?.querySelector('.recharts-wrapper svg');
@@ -194,17 +210,17 @@ export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap text-sm">
           {/* Chart type selector */}
-          <div className="flex items-center gap-1 bg-muted/30 rounded-lg p-1 mr-2">
+          <div className="mr-2 flex items-center gap-1 rounded-xl border border-white/[0.06] bg-[#101012] p-1">
             {CHART_TYPE_OPTIONS.map(({ type, icon: Icon, label }) => (
               <motion.button
                 key={type}
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setChartType(type)}
                 title={label}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 ${chartType === type
-                  ? 'bg-primary/20 text-primary shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  ? 'bg-white/[0.06] text-slate-100 border border-white/[0.08]'
+                  : 'text-slate-500 hover:bg-white/[0.04] hover:text-slate-200'
                   }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -259,8 +275,8 @@ export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
         {/* Actions */}
         <div className="flex items-center gap-1 ml-auto">
           {chartRecommendation?.reason && (
-            <span className="text-[10px] text-muted-foreground mr-2 hidden md:inline">
-              💡 {chartRecommendation.reason}
+            <span className="text-[10px] text-[#c2c6d7] mr-2 hidden md:inline">
+              {chartRecommendation.reason}
             </span>
           )}
           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
@@ -284,7 +300,7 @@ export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
       </div>
 
       {/* Chart area */}
-      <div className="flex-1 min-h-0 relative">
+      <div className="custom-scrollbar relative min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={chartType}
@@ -292,7 +308,8 @@ export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="h-full w-full"
+            className="h-full"
+            style={{ minWidth: chartCanvasWidth, width: chartCanvasWidth }}
           >
             {chartType === 'bar' && <BarChartView data={processedData} xKey={xKey} numericKeys={numericKeys} />}
             {chartType === 'line' && <LineChartView data={processedData} xKey={xKey} numericKeys={numericKeys} />}
@@ -313,21 +330,28 @@ const axisProps = {
   fontSize: 11,
   tickLine: false,
   axisLine: false,
+  tick: { fill: AXIS_COLOR },
+};
+
+const formatAxisLabel = (value: unknown) => {
+  const label = String(value ?? '');
+  return label.length > 14 ? `${label.slice(0, 12)}...` : label;
 };
 
 // ── Bar Chart ───────────────────────────────────────────────────────────
-function BarChartView({ data, xKey, numericKeys }: { data: any[]; xKey: string; numericKeys: string[]; }) {
+function BarChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+      <BarChart data={data} margin={{ top: 14, right: 18, bottom: 20, left: 8 }}>
         <CartesianGrid vertical={false} stroke={GRID_COLOR} />
-        <XAxis dataKey={xKey} {...axisProps} />
-        <YAxis {...axisProps} />
+        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={formatAxisLabel} />
+        <YAxis {...axisProps} width={54} />
         <Tooltip content={<CustomTooltip />} />
         {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: AXIS_COLOR }} />}
         {numericKeys.map((key, i) => (
           <Bar key={key} dataKey={key} fill={CHART_COLORS[i % CHART_COLORS.length]}
-            radius={[4, 4, 0, 0]} maxBarSize={48} />
+            fillOpacity={0.92} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeOpacity={0.75}
+            isAnimationActive={false} radius={[5, 5, 0, 0]} maxBarSize={48} />
         ))}
       </BarChart>
     </ResponsiveContainer>
@@ -335,19 +359,21 @@ function BarChartView({ data, xKey, numericKeys }: { data: any[]; xKey: string; 
 }
 
 // ── Line Chart ──────────────────────────────────────────────────────────
-function LineChartView({ data, xKey, numericKeys }: { data: any[]; xKey: string; numericKeys: string[]; }) {
+function LineChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+      <LineChart data={data} margin={{ top: 14, right: 18, bottom: 20, left: 8 }}>
         <CartesianGrid vertical={false} stroke={GRID_COLOR} />
-        <XAxis dataKey={xKey} {...axisProps} />
-        <YAxis {...axisProps} />
+        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={formatAxisLabel} />
+        <YAxis {...axisProps} width={54} />
         <Tooltip content={<CustomTooltip />} />
         {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: AXIS_COLOR }} />}
         {numericKeys.map((key, i) => (
           <Line key={key} type="monotone" dataKey={key}
             stroke={CHART_COLORS[i % CHART_COLORS.length]}
-            strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            strokeWidth={3} connectNulls isAnimationActive={false}
+            dot={{ r: 3, fill: CHART_COLORS[i % CHART_COLORS.length], strokeWidth: 0 }}
+            activeDot={{ r: 5, fill: CHART_COLORS[i % CHART_COLORS.length] }} />
         ))}
       </LineChart>
     </ResponsiveContainer>
@@ -355,27 +381,27 @@ function LineChartView({ data, xKey, numericKeys }: { data: any[]; xKey: string;
 }
 
 // ── Area Chart ──────────────────────────────────────────────────────────
-function AreaChartView({ data, xKey, numericKeys }: { data: any[]; xKey: string; numericKeys: string[]; }) {
+function AreaChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+      <AreaChart data={data} margin={{ top: 14, right: 18, bottom: 20, left: 8 }}>
         <defs>
           {numericKeys.map((key, i) => (
             <linearGradient key={key} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.3} />
-              <stop offset="100%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.02} />
+              <stop offset="0%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.42} />
+              <stop offset="100%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.06} />
             </linearGradient>
           ))}
         </defs>
         <CartesianGrid vertical={false} stroke={GRID_COLOR} />
-        <XAxis dataKey={xKey} {...axisProps} />
-        <YAxis {...axisProps} />
+        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={formatAxisLabel} />
+        <YAxis {...axisProps} width={54} />
         <Tooltip content={<CustomTooltip />} />
         {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: AXIS_COLOR }} />}
         {numericKeys.map((key, i) => (
           <Area key={key} type="monotone" dataKey={key}
             stroke={CHART_COLORS[i % CHART_COLORS.length]}
-            fill={`url(#grad-${i})`} strokeWidth={2} />
+            fill={`url(#grad-${i})`} strokeWidth={3} connectNulls isAnimationActive={false} />
         ))}
       </AreaChart>
     </ResponsiveContainer>
@@ -383,7 +409,7 @@ function AreaChartView({ data, xKey, numericKeys }: { data: any[]; xKey: string;
 }
 
 // ── Pie Chart ───────────────────────────────────────────────────────────
-function PieChartView({ data, xKey, numericKeys }: { data: any[]; xKey: string; numericKeys: string[]; }) {
+function PieChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
   const valueKey = numericKeys[0] || Object.keys(data[0])[1];
 
   return (
@@ -399,7 +425,8 @@ function PieChartView({ data, xKey, numericKeys }: { data: any[]; xKey: string; 
           innerRadius="40%"
           strokeWidth={2}
           stroke="#0f172a"
-          label={({ name, percent }: any) => `${name} (${(percent * 100).toFixed(0)}%)`}
+          isAnimationActive={false}
+          label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} (${((percent ?? 0) * 100).toFixed(0)}%)`}
           labelLine={{ stroke: AXIS_COLOR }}
         >
           {data.map((_, i) => (
@@ -414,7 +441,7 @@ function PieChartView({ data, xKey, numericKeys }: { data: any[]; xKey: string; 
 }
 
 // ── KPI Cards ───────────────────────────────────────────────────────────
-function KPIView({ data, keys }: { data: any[]; keys: string[]; }) {
+function KPIView({ data, keys }: { data: ChartRow[]; keys: string[]; }) {
   // Use first row for KPI values
   const row = data[0];
 
@@ -424,8 +451,10 @@ function KPIView({ data, keys }: { data: any[]; keys: string[]; }) {
         const val = row[key];
         const isNum = typeof val === 'number';
         return (
-          <Card key={key}
-            className="p-5 border-border bg-gradient-to-br from-card to-muted/20 flex flex-col justify-center">
+          <Card
+  key={key}
+  className="flex flex-col justify-center rounded-2xl border border-white/[0.06] bg-[#101012] p-5 transition-all duration-200 hover:border-white/[0.1]"
+>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
               {key.replace(/_/g, ' ')}
             </p>
@@ -440,14 +469,14 @@ function KPIView({ data, keys }: { data: any[]; keys: string[]; }) {
 }
 
 // ── Table View ──────────────────────────────────────────────────────────
-function TableView({ data, keys }: { data: any[]; keys: string[]; }) {
+function TableView({ data, keys }: { data: ChartRow[]; keys: string[]; }) {
   return (
-    <div className="h-full overflow-auto rounded-lg border border-border">
+    <div className="h-full overflow-auto rounded-2xl border border-white/[0.06] bg-[#101012]">
       <table className="results-table w-full">
         <thead className="sticky top-0">
           <tr>
             {keys.map(key => (
-              <th key={key} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/30">
+              <th key={key} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-[#101012]">
                 {key}
               </th>
             ))}
@@ -455,7 +484,7 @@ function TableView({ data, keys }: { data: any[]; keys: string[]; }) {
         </thead>
         <tbody>
           {data.map((row, i) => (
-            <tr key={i} className="transition-colors duration-150 hover:bg-muted/20 border-t border-border/50">
+            <tr key={i} className="transition-colors duration-150 hover:bg-[#101012] border-t border-white/[0.06]">
               {keys.map(key => (
                 <td key={key} className="px-4 py-3 text-sm text-foreground">
                   {typeof row[key] === 'number' ? (row[key] as number).toLocaleString() : String(row[key] ?? '')}

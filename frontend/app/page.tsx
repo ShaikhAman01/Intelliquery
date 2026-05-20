@@ -7,11 +7,10 @@ import { SQLDisplay } from "@/components/Query/SQLDisplay";
 import { ResultsPanel } from "@/components/Results/ResultsPanel";
 import { InsightsPanel } from "@/components/Results/InsightsPanel";
 import { ChartPanel } from "@/components/Chat/Visualizer";
-import { HistoryPanel } from "@/components/History/HistoryPanel";
 import { AddConnectionDialog } from "@/components/Shared/AddConnectionDialog";
 import { useStore } from "@/lib/store";
 import { api } from "@/lib/api";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -23,11 +22,11 @@ import {
   Plus,
   Loader2,
   Zap,
-  Code2,
-  MoreHorizontal,
   AlertTriangle,
   Send,
   TrendingUp,
+  Users,
+  Calendar,
 } from "lucide-react";
 import { useSession } from "@/lib/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -190,10 +189,29 @@ function DashboardContent() {
   >();
 
   const [activeTab, setActiveTab] = useState("chart");
-  const [showHistory, setShowHistory] = useState(false);
+  const [activeSection, setActiveSection] = useState<
+    "chart" | "results" | "insights" | "explainer"
+  >("chart");
   const [querySource, setQuerySource] = useState("");
   const [executionTime, setExecutionTime] = useState(0);
   const [error, setError] = useState("");
+
+  const activeConnection = useMemo(() => connections.find((conn) => conn.id === activeConnectionId), [connections, activeConnectionId]);
+  const queryRef = useRef<HTMLDivElement>(null);
+  const sqlRef = useRef<HTMLDivElement>(null);
+
+  const dataMetadata = useMemo(() => {
+    if (!data || data.length === 0) return { title: "Analytical Workspace View", primaryMetric: "—", dimensions: 0 };
+    const columns = Object.keys(data[0]);
+    const matchedNumber = columns.find(c => typeof data[0][c] === "number");
+    const matchedString = columns.find(c => typeof data[0][c] === "string") || columns[0];
+
+    return {
+      title: matchedNumber && matchedString ? `Evaluation of ${matchedNumber.toUpperCase()} relative to ${matchedString.toUpperCase()}` : "Dynamic Target Analytics Matrix",
+      primaryMetric: matchedNumber ? matchedNumber.replace(/_/g, " ") : "Row Metric Count",
+      dimensions: columns.length
+    };
+  }, [data]);
 
   const handleSubmit = async () => {
     if (!input.trim() || !activeConnectionId) return;
@@ -221,8 +239,8 @@ function DashboardContent() {
       setChartRec(
         (res.data.chart_recommendation as typeof chartRec) || undefined,
       );
-      setQuerySource(res.data.query_source || "");
-      setExecutionTime(res.data.execution_time_ms || 0);
+      setQuerySource(res.data.query_source || "ENGINE");
+      setExecutionTime(res.data.execution_time_ms || duration);
       setInsights(res.data.visualization || null);
 
       toast(`Query executed successfully in ${duration}ms`, "success");
@@ -271,7 +289,6 @@ function DashboardContent() {
     (question: string, historySql: string) => {
       setInput(question);
       setSql(historySql);
-      setShowHistory(false);
 
       if (activeConnectionId) {
         setLoading(true);
@@ -289,7 +306,7 @@ function DashboardContent() {
             setChartRec(
               (res.data.chart_recommendation as typeof chartRec) || undefined,
             );
-            setQuerySource(res.data.query_source || "");
+            setQuerySource(res.data.query_source || "ENGINE");
             setExecutionTime(res.data.execution_time_ms || 0);
             setInsights(res.data.visualization || null);
 
@@ -307,23 +324,50 @@ function DashboardContent() {
   );
 
   const handleFollowUp = () => {
-    const prefix = data.length > 0 ? "Based on the previous results, " : "";
-    setInput(prefix);
+    if (!input.trim()) return;
+    setInput((prev) => `Refining investigation path: "${prev}". Isolate variance shifts inside trailing rows.`);
   };
 
-  const activeConnection = connections.find((conn) => conn.id === activeConnectionId);
+  const handleSectionSelect = (
+    section: "chart" | "results" | "insights" | "explainer" | "query",
+  ) => {
+    if (section === "query") {
+      queryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    setActiveSection(section);
+
+    if (section === "explainer") {
+      sqlRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    setActiveTab(section);
+  };
 
   return (
-    <div className="relative flex h-[100dvh] overflow-hidden bg-[#0d0d0f] text-[#e5e1e4]">
-      <Sidebar className="hidden w-[280px] lg:flex" />
+    <div className="relative flex h-[100dvh] overflow-hidden bg-[#0b0b0c] text-[#e5e1e4]">
+      <Sidebar className="hidden w-[260px] lg:flex" onNavigate={handleSectionSelect} onReplay={handleReplay} />
 
       <div className="flex h-full min-w-0 flex-1 flex-col">
         <Header
-          onExecute={handleSubmit}
-          onHistory={() => setShowHistory(!showHistory)}
-          isExecuting={isLoading}
-          canExecute={Boolean(activeConnectionId && input.trim())}
-        />
+          onReplay={handleReplay}
+          onSectionSelect={handleSectionSelect}
+          activeSection={activeSection}
+        >
+          <div ref={queryRef}>
+            <QueryInput
+              value={input}
+              onChange={setInput}
+              onSubmit={handleSubmit}
+              onTemplateClick={handleTemplateClick}
+              isLoading={isLoading}
+              disabled={!activeConnectionId}
+              showSuggestions={false}
+            />
+          </div>
+        </Header>
 
         {connections.length === 0 ? (
           <motion.div
@@ -331,7 +375,7 @@ function DashboardContent() {
             animate={{ opacity: 1, scale: 1 }}
             className="flex-1 flex items-center justify-center p-6 h-full overflow-y-auto"
           >
-            <div className="max-w-2xl w-full p-12 rounded-3xl border-2 border-dashed border-border/60 bg-card/20 backdrop-blur-sm text-center space-y-8 flex flex-col items-center">
+            <div className="max-w-2xl w-full p-12 rounded-3xl border border-dashed border-white/10 bg-card/20 backdrop-blur-sm text-center space-y-8 flex flex-col items-center">
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
                 <div className="w-24 h-24 bg-card rounded-3xl flex items-center justify-center shadow-xl border border-border relative z-10">
@@ -364,83 +408,45 @@ function DashboardContent() {
             </div>
           </motion.div>
         ) : (
-          <main className="custom-scrollbar relative flex-1 overflow-y-auto px-4 py-8 md:px-10 md:py-12">
-            <div className="pointer-events-none absolute left-1/2 top-0 h-[440px] w-[820px] -translate-x-1/2 rounded-full bg-[#571bc1]/10 blur-[120px]" />
+          <main className="custom-scrollbar relative flex-1 overflow-y-auto px-4 pb-6 md:px-6">
+            <div className="pointer-events-none absolute inset-x-0 top-[-160px] h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,0.05),transparent_64%)]" />
 
-            <div className="relative mx-auto max-w-[1170px] space-y-8 pb-12">
+            <div className="relative mx-auto max-w-[1550px] space-y-6 pt-2 pb-6">
               <motion.div
                 layout
-                initial={{ opacity: 0, y: 18 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.05 }}
+                transition={{ duration: 0.35, delay: 0.05 }}
+                className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2 px-1"
               >
-                <QueryInput
-                  value={input}
-                  onChange={setInput}
-                  onSubmit={handleSubmit}
-                  onTemplateClick={handleTemplateClick}
-                  isLoading={isLoading}
-                  disabled={!activeConnectionId}
-                />
-              </motion.div>
-
-              <motion.div layout className="mx-auto flex max-w-[960px] flex-wrap items-center justify-center gap-2 px-1">
-                {data.length > 0 && (
+                {[
+  {
+    label: "Find unusual spikes in activity",
+    icon: AlertTriangle,
+    color: "text-[#ffb4ab]"
+  },
+  {
+    label: "Compare weekly growth trends",
+    icon: TrendingUp,
+    color: "text-[#4edea3]"
+  },
+  {
+    label: "Detect anomalies in recent records",
+    icon: Zap,
+    color: "text-[#d0bcff]"
+  },
+].map(({ label, icon: Icon, color }) => (
                   <button
-                    onClick={handleFollowUp}
-                    className="flex items-center gap-1.5 rounded-full border border-[#afc6ff]/15 bg-[#afc6ff]/10 px-3 py-1.5 text-xs font-semibold text-[#afc6ff] transition-all hover:bg-[#afc6ff]/15"
+                    key={label}
+                    onClick={() => handleTemplateClick(label)}
+                    disabled={isLoading || !activeConnectionId}
+                    className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#121214] px-3.5 py-1.5 text-[12px] font-medium text-slate-400 shadow-sm transition-all duration-300 hover:border-white/10 hover:bg-[#1a1a1c] hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <MessageSquarePlus className="h-3.5 w-3.5" />
-                    Follow-up
+                    <Icon className={`h-3.5 w-3.5 ${color}`} />
+                    {label}
                   </button>
-                )}
-
-                {querySource && (
-                  <span
-                    className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-sm ${
-                      querySource === "DYNAMIC"
-                        ? "border border-[#4edea3]/20 bg-[#4edea3]/10 text-[#4edea3]"
-                        : "border border-[#d0bcff]/20 bg-[#d0bcff]/10 text-[#d0bcff]"
-                    }`}
-                  >
-                    {querySource === "DYNAMIC" ? <Zap className="w-3 h-3"/> : <Sparkles className="w-3 h-3"/>}
-                    {querySource}
-                    {executionTime > 0 && <span className="opacity-70 font-medium ml-1">· {executionTime}ms</span>}
-                  </span>
-                )}
-
-                <button
-                  onClick={() => setShowHistory(!showHistory)}
-                  className={`flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-semibold transition-all ${
-                    showHistory
-                      ? "border-[#afc6ff] bg-[#afc6ff] text-[#002760] shadow-md"
-                      : "border-white/10 bg-[#353437]/50 text-[#c2c6d7] hover:bg-white/[0.06] hover:text-[#e5e1e4]"
-                  }`}
-                >
-                  <Clock className={`h-3.5 w-3.5 ${showHistory ? "animate-pulse" : ""}`} />
-                  History
-                </button>
+                ))}
               </motion.div>
-
-              {/* History panel (expandable) */}
-              <AnimatePresence>
-                {showHistory && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0, y: -10 }}
-                    animate={{ opacity: 1, height: "auto", y: 0 }}
-                    exit={{ opacity: 0, height: 0, y: -10 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                    className="mx-auto min-h-[300px] w-full max-w-[960px] overflow-hidden rounded-3xl border border-white/10 bg-[#1c1b1d]/80 shadow-2xl"
-                  >
-                    <div className="h-full p-4 overflow-hidden flex flex-col">
-                      <HistoryPanel
-                        connectionId={activeConnectionId}
-                        onReplay={handleReplay}
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               <AnimatePresence>
                 {error && (
@@ -466,50 +472,54 @@ function DashboardContent() {
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.42, delay: 0.16 }}
-                className="glass-panel overflow-hidden rounded-[24px] shadow-[0_30px_90px_rgba(0,0,0,0.32)]"
+                className="glass-panel overflow-hidden rounded-2xl border border-white/[0.06]"
               >
                 <Tabs
                   value={activeTab}
-                  onValueChange={setActiveTab}
-                  className="flex min-h-[620px] flex-col"
+                  onValueChange={(value) => {
+                    setActiveTab(value);
+                    if (value === "chart" || value === "results" || value === "insights") {
+                      setActiveSection(value);
+                    }
+                  }}
+                  className="flex min-h-[640px] flex-col"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-[#0e0e10]/55 px-6 py-4">
-                    <TabsList className="h-auto gap-6 bg-transparent p-0">
-                      <TabsTrigger
-                        value="chart"
-                        className="gap-2 rounded-none border-b-2 border-transparent bg-transparent px-0 pb-2 pt-0 text-sm font-semibold text-[#c2c6d7] shadow-none transition-all data-[state=active]:border-[#afc6ff] data-[state=active]:bg-transparent data-[state=active]:text-[#afc6ff] data-[state=active]:shadow-none"
-                      >
-                        <BarChart3 className="h-4 w-4" />
-                        Visualization
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="results"
-                        className="gap-2 rounded-none border-b-2 border-transparent bg-transparent px-0 pb-2 pt-0 text-sm font-semibold text-[#c2c6d7] shadow-none transition-all data-[state=active]:border-[#afc6ff] data-[state=active]:bg-transparent data-[state=active]:text-[#afc6ff] data-[state=active]:shadow-none"
-                      >
-                        <Table className="h-4 w-4" />
-                        Data Grid
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="insights"
-                        className="gap-2 rounded-none border-b-2 border-transparent bg-transparent px-0 pb-2 pt-0 text-sm font-semibold text-[#c2c6d7] shadow-none transition-all data-[state=active]:border-[#afc6ff] data-[state=active]:bg-transparent data-[state=active]:text-[#afc6ff] data-[state=active]:shadow-none"
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        AI Insights
-                      </TabsTrigger>
-                    </TabsList>
-                    <div className="flex items-center gap-3">
-                      {(executionTime > 0 || querySource) && (
-                        <span className="rounded-md bg-[#353437]/45 px-3 py-1 font-mono text-xs text-[#8c90a0]">
-                          {executionTime > 0 ? `Took ${(executionTime / 1000).toFixed(1)}s` : querySource}
-                        </span>
-                      )}
-                      <button className="text-[#c2c6d7] transition-colors hover:text-[#e5e1e4]">
-                        <MoreHorizontal className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </div>
+  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.05] bg-[#121214]/70 px-6 py-2.5 backdrop-blur-xl">
+<TabsList className="h-auto gap-8 bg-transparent p-0">
+  <TabsTrigger
+    value="chart"
+    className="-mb-px flex items-center gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-0 pb-3 pt-0 text-[13px] font-medium text-slate-500 outline-none ring-0 shadow-none transition-all duration-200 hover:bg-transparent hover:text-slate-300 focus-visible:ring-0 focus-visible:outline-none data-[state=active]:border-[#d9e2ff] data-[state=active]:bg-transparent data-[state=active]:text-[#eef2ff] data-[state=active]:shadow-none"
+  >
+    <BarChart3 className="h-4 w-4" />
+    Visualization
+  </TabsTrigger>
 
-                  <div className="flex-1 bg-[#1c1b1d]/30 p-5 md:p-6">
+  <TabsTrigger
+    value="results"
+    className="-mb-px flex items-center gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-0 pb-3 pt-0 text-[13px] font-medium text-slate-500 outline-none ring-0 shadow-none transition-all duration-200 hover:bg-transparent hover:text-slate-300 focus-visible:ring-0 focus-visible:outline-none data-[state=active]:border-[#d9e2ff] data-[state=active]:bg-transparent data-[state=active]:text-[#eef2ff] data-[state=active]:shadow-none"
+  >
+    <Table className="h-4 w-4" />
+    Data Grid
+  </TabsTrigger>
+
+  <TabsTrigger
+    value="insights"
+    className="-mb-px flex items-center gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-0 pb-3 pt-0 text-[13px] font-medium text-slate-500 outline-none ring-0 shadow-none transition-all duration-200 hover:bg-transparent hover:text-slate-300 focus-visible:ring-0 focus-visible:outline-none data-[state=active]:border-[#d9e2ff] data-[state=active]:bg-transparent data-[state=active]:text-[#eef2ff] data-[state=active]:shadow-none"
+  >
+    <Sparkles className="h-4 w-4" />
+    AI Insights
+  </TabsTrigger>
+</TabsList>
+
+  <div className="flex items-center gap-2 text-xs text-slate-400">
+    <div className="flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5 font-mono text-[11px] text-slate-300 transition-colors duration-200 hover:border-white/[0.08] hover:bg-white/[0.04]">
+      <Calendar className="h-3.5 w-3.5 text-slate-500" />
+      <span>Dynamic Runtime Timeframe</span>
+    </div>
+  </div>
+</div>
+
+                  <div className="flex-1 bg-transparent p-5 md:p-6">
                     {isLoading ? (
                       <div className="h-full flex flex-col gap-6 animate-pulse">
                         <div className="flex items-center gap-4">
@@ -523,21 +533,19 @@ function DashboardContent() {
                         <Skeleton className="flex-1 w-full rounded-2xl bg-muted-foreground/5 border border-border/50" />
                       </div>
                     ) : (
-                      <div className="grid min-h-[540px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+                      <div className="grid min-h-[560px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
                         <div className="min-w-0 space-y-6">
-                          <TabsContent value="chart" className="m-0 h-[340px] outline-none">
-                            <div className="h-full rounded-2xl border border-white/[0.06] bg-[#0e0e10]/80 p-5">
-                              <div className="mb-4 flex items-start justify-between">
-                                <div>
-                                  <h3 className="text-lg font-semibold tracking-tight text-[#e5e1e4]">
-                                    Monthly Revenue vs. Churn Rate
-                                  </h3>
-                                  <p className="mt-1 text-sm font-medium tracking-wide text-[#c2c6d7]">
-                                    {activeConnection ? `Aggregated from ${activeConnection.name}.` : 'Run a query to generate a visualization.'}
-                                  </p>
-                                </div>
+                          <TabsContent value="chart" className="m-0 h-[410px] outline-none">
+                            <div className="premium-card h-full rounded-xl p-5 border border-white/[0.04] bg-[#121214]/40">
+                              <div className="mb-4">
+                                <h3 className="text-sm font-semibold tracking-tight text-[#e5e1e4] font-mono">
+                                  {dataMetadata.title}
+                                </h3>
+                                <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                                  {activeConnection ? `Operational Instance Path: postgres://${activeConnection.name}` : 'Run a context workspace query.'}
+                                </p>
                               </div>
-                              <div className="h-[250px]">
+                              <div className="h-[320px]">
                                 <ChartPanel
                                   data={data}
                                   chartRecommendation={chartRec}
@@ -545,13 +553,13 @@ function DashboardContent() {
                               </div>
                             </div>
                           </TabsContent>
-                          <TabsContent value="results" className="m-0 h-[340px] outline-none">
-                            <div className="h-full rounded-2xl border border-white/[0.06] bg-[#0e0e10]/80 p-5">
+                          <TabsContent value="results" className="m-0 h-[410px] outline-none">
+                            <div className="premium-card h-full rounded-xl border border-white/[0.04] bg-[#121214]/40 p-5">
                               <ResultsPanel data={data} />
                             </div>
                           </TabsContent>
-                          <TabsContent value="insights" className="m-0 h-[340px] outline-none">
-                            <div className="h-full rounded-2xl border border-white/[0.06] bg-[#0e0e10]/80 p-5">
+                          <TabsContent value="insights" className="m-0 h-[410px] outline-none">
+                            <div className="premium-card h-full rounded-xl border border-white/[0.04] bg-[#121214]/40 p-5">
                               <InsightsPanel
                                 data={data}
                                 explanation={explanation}
@@ -560,68 +568,60 @@ function DashboardContent() {
                             </div>
                           </TabsContent>
 
-                          <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0e0e10]/80">
-                            <div className="flex items-center justify-between border-b border-white/[0.06] bg-[#353437]/60 px-4 py-3">
-                              <div className="flex items-center gap-2 font-mono text-xs font-medium tracking-widest text-[#e5e1e4]">
-                                <Code2 className="h-4 w-4" />
-                                Generated SQL
-                              </div>
-                            </div>
-                            <div className="h-[260px] p-4">
+                          <div ref={sqlRef} className="overflow-hidden bg-[#070708]">
+                            <div className="h-[340px] py-4">
                               <SQLDisplay sql={sql} />
                             </div>
                           </div>
                         </div>
 
-                        <aside className="flex min-h-0 flex-col gap-5">
-                          <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#571bc1] to-[#d0bcff] shadow-[0_0_22px_rgba(87,27,193,0.42)]">
-                              <Sparkles className="h-5 w-5 text-[#002d6d]" fill="currentColor" />
+                        <aside className="flex min-h-0 flex-col gap-4 rounded-xl border border-white/[0.04] bg-[#0d0d0f] p-4">
+                          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                            <h3 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                              <Clock className="h-3.5 w-3.5 text-primary" /> Architecture Metrics
+                            </h3>
+                            <span className="text-[10px] font-mono bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06]">
+                              {executionTime > 0 ? `${executionTime}ms` : "0ms"}
+                            </span>
+                          </div>
+                          
+                          <div className="font-mono text-[11px] bg-[#070708] p-3 rounded-lg border border-white/[0.04] space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Row Matrix Volume:</span>
+                              <span className="text-slate-200 font-bold">{data.length} entries</span>
                             </div>
-                            <p className="text-sm leading-relaxed text-[#e5e1e4]">
-                              {explanation || `I will analyze the results from ${activeConnection?.name || 'your active database'} and surface key patterns here.`}
-                            </p>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Data Dimensions:</span>
+                              <span className="text-slate-200 font-bold">{dataMetadata.dimensions} columns</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Primary Key Track:</span>
+                              <span className="text-primary font-bold truncate max-w-[150px]">{dataMetadata.primaryMetric}</span>
+                            </div>
                           </div>
 
-                          <div className="rounded-2xl border border-white/[0.06] bg-[#0e0e10]/55 p-5">
-                            <div className="mb-3 flex items-center gap-2">
-                              <TrendingUp className="h-4 w-4 text-[#4edea3]" />
-                              <h4 className="font-mono text-xs font-bold uppercase tracking-widest text-[#e5e1e4]">Growth Spike</h4>
+                          <div className="bg-[#121214]/50 p-4 rounded-xl border border-white/[0.04] flex-1 flex flex-col justify-between min-h-[220px]">
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 text-slate-400 font-mono text-[11px]">
+                                <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                                <span>AI Agent Analysis Trace</span>
+                              </div>
+                              <p className="text-xs leading-relaxed text-slate-300 custom-scrollbar overflow-y-auto max-h-[160px]">
+                                {explanation || `Awaiting structural execution stream to evaluate parameters from your data grid layers.`}
+                              </p>
                             </div>
-                            <p className="text-sm leading-relaxed text-[#c2c6d7]">
-                              {data.length > 0
-                                ? `${data.length} rows returned. Use the chart controls to compare measures and spot momentum.`
-                                : 'Run a query to populate trend and growth summaries.'}
-                            </p>
-                          </div>
 
-                          <div className="rounded-2xl border border-[#ffb4ab]/25 bg-[#93000a]/12 p-5">
-                            <div className="mb-3 flex items-center gap-2">
-                              <AlertTriangle className="h-4 w-4 text-[#ffb4ab]" />
-                              <h4 className="font-mono text-xs font-bold uppercase tracking-widest text-[#ffb4ab]">Churn Anomaly</h4>
-                            </div>
-                            <p className="text-sm leading-relaxed text-[#c2c6d7]">
-                              {error || 'Anomaly notes will appear when the AI detects unusual movements in your result set.'}
-                            </p>
-                            <button
-                              onClick={handleFollowUp}
-                              className="mt-4 flex items-center gap-1 text-xs font-semibold text-[#afc6ff] transition-colors hover:text-[#d9e2ff]"
-                            >
-                              Run deeper cohort analysis <Send className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-
-                          <div className="mt-auto border-t border-white/[0.06] pt-5">
-                            <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-[#8c90a0]">
-                              Suggested Follow-up
-                            </p>
-                            <button
-                              onClick={() => setInput('Compare this year vs last year')}
-                              className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-[#353437]/75 p-4 text-left text-sm text-[#e5e1e4] transition-colors hover:bg-[#424754]/80"
-                            >
-                              <span className="truncate">Compare this year vs last year</span>
-                              <Send className="h-4 w-4 text-[#8c90a0]" />
-                            </button>
+                            {data.length > 0 && (
+                              <div className="pt-3 border-t border-white/[0.04] mt-2">
+                                <button
+                                  onClick={handleFollowUp}
+                                  className="w-full flex items-center justify-between rounded-lg border border-white/10 bg-[#161618] p-3 text-left text-xs text-[#e5e1e4] transition hover:bg-[#1e1e21]"
+                                >
+                                  <span className="truncate font-mono text-[11px] text-slate-400">Drill down into structural telemetry variants</span>
+                                  <Send className="h-3 w-3 text-slate-500" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </aside>
                       </div>
@@ -633,23 +633,6 @@ function DashboardContent() {
           </main>
         )}
       </div>
-
-      {/* Connection Status Banner */}
-      <AnimatePresence>
-        {!activeConnectionId && connections.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-6 left-1/2 -translate-x-1/2 bg-amber-500/10 border border-amber-500/30 rounded-full px-5 py-2.5 z-50 shadow-lg backdrop-blur-md flex items-center gap-2"
-          >
-            <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-            <p className="text-amber-600 dark:text-amber-400 text-sm font-semibold tracking-wide">
-              Select a database from the sidebar to begin
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
