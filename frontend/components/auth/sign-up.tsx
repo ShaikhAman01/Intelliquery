@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,10 @@ import Link from "next/link";
 
 export default function SignUp() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const redirectTo = searchParams.get("redirect") || "/";
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,7 +44,7 @@ export default function SignUp() {
       if (error) {
         setError(error.message || "Something went wrong");
       } else {
-        router.push("/");
+        router.push(redirectTo);
       }
     });
   };
@@ -48,7 +52,7 @@ export default function SignUp() {
   const handleGoogleSignIn = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/",
+      callbackURL: redirectTo,
     });
   };
 
@@ -169,7 +173,7 @@ export default function SignUp() {
         <p className="text-sm text-slate-400">
           Already have an account?{" "}
           <Link
-            href="/sign-in"
+            href={redirectTo !== "/" ? `/sign-in?redirect=${encodeURIComponent(redirectTo)}` : "/sign-in"}
             className="text-cyan-400 hover:text-cyan-300 font-medium"
           >
             Sign in

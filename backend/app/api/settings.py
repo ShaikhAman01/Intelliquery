@@ -353,3 +353,33 @@ def update_member_role(
 
     logger.info(f"Role updated: {target.email} -> {data.role} by {current_user.email}")
     return {"status": "success", "message": f"Role updated to {data.role}."}
+
+@router.post("/team/join-via-slug/{slug}")
+def join_via_slug(
+    slug: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Allow an authenticated user without an organization to join via a public link."""
+    if current_user.org_id:
+        raise HTTPException(
+            status_code=400, 
+            detail="You already belong to an organization."
+        )
+
+    org = db.query(Organization).filter(Organization.slug == slug).first()
+    if not org:
+        raise HTTPException(
+            status_code=404, 
+            detail="The invitation link is invalid or has expired."
+        )
+
+    current_user.org_id = org.id
+    current_user.role = "viewer"
+    db.commit()
+
+    logger.info(f"User {current_user.email} joined org {org.name} via public slug link.")
+    return {
+        "status": "success",
+        "message": f"You have successfully joined {org.name} as a viewer."
+    }

@@ -1,8 +1,6 @@
 'use client';
 
 import { AuthGuard, useSession } from '@/lib/use-auth';
-import { Header } from '@/components/Layout/Header';
-import { Sidebar } from '@/components/Layout/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, Building2, Users, Shield, Mail, Copy, Check, Loader2, AlertCircle, X, CheckCircle2, XCircle } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     updateProfile,
@@ -32,85 +30,96 @@ export default function SettingsPage() {
     );
 }
 
-/* ── Toast helper for feedback ──────────────────────────────────────────── */
+/* Status Messages */
 
 function StatusMessage({ message, type }: { message: string; type: 'success' | 'error'; }) {
     if (!message) return null;
     return (
-        <div className={`flex items-center gap-2 text-sm p-3 rounded-md border ${type === 'success'
-            ? 'text-emerald-400 bg-emerald-950/20 border-emerald-900/50'
-            : 'text-red-400 bg-red-950/20 border-red-900/50'
+        <div className={`flex items-center gap-2.5 text-sm p-4 rounded-2xl border ${type === 'success'
+            ? 'text-emerald-400 bg-[#0d0e10] border-emerald-500/20'
+            : 'text-red-400 bg-[#0d0e10] border-red-500/20'
             }`}>
-            {type === 'error' && <AlertCircle className="h-4 w-4" />}
-            {type === 'success' && <Check className="h-4 w-4" />}
-            <span>{message}</span>
+            {type === 'error' && <AlertCircle className="h-4 w-4 shrink-0" />}
+            {type === 'success' && <Check className="h-4 w-4 shrink-0" />}
+            <span className="font-normal">{message}</span>
         </div>
     );
 }
 
-/* ── Main content ───────────────────────────────────────────────────────── */
+/* ── Main Settings Panel Canvas ─────────────────── */
 
 function SettingsContent() {
     const { user } = useSession();
     const router = useRouter();
+    const [activeTab, setActiveTab] = useState("profile");
+    const [org, setOrg] = useState<any>(null);
+
+    useEffect(() => {
+    getOrganization().then(data => {
+        if (data?.org) setOrg(data.org);
+    }).catch(() => {});
+}, []);
 
     return (
-        <div className="flex h-screen bg-background text-foreground">
-            <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-auto p-6">
-                    <div className="max-w-3xl mx-auto space-y-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-2xl font-bold">Settings</h2>
-                                <p className="text-muted-foreground">Manage your account and organization</p>
-                            </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => router.push('/')}
-                                className="text-muted-foreground hover:text-foreground"
-                                title="Close settings"
-                            >
-                                <X className="h-5 w-5" />
-                            </Button>
+        <div className="min-h-screen bg-[#09090b] text-[#e5e1e4] flex flex-col relative">
+            <main className="relative flex-1 overflow-y-auto px-6 py-10 md:px-12 z-10">
+                <div className="max-w-6xl mx-auto space-y-8">
+                    
+                    <div className="flex items-center justify-between border-b border-white/[0.06] pb-5">
+                        <div className="space-y-1">
+                            <h2 className="text-2xl font-bold tracking-tight text-[#e5e1e4]">Settings</h2>
+                            <p className="text-sm text-slate-400">Manage your workspace and team settings.</p>
                         </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => router.push('/')}
+                            className="h-9 w-9 text-slate-400 hover:text-slate-200 border border-white/[0.06] bg-[#111214] rounded-xl transition-colors"
+                            title="Close settings"
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
 
-                        {/* Pending Invites Banner */}
-                        <PendingInvitesBanner />
+                    <PendingInvitesBanner />
 
-                        <Tabs defaultValue="profile" className="space-y-6">
-                            <TabsList className="bg-muted/50">
-                                <TabsTrigger value="profile" className="gap-2">
-                                    <User className="h-4 w-4" /> Profile
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                        <div className="flex border-b border-white/[0.06] bg-[#0d0e10] p-1 rounded-xl border border-white/[0.04] w-fit">
+                            <TabsList className="h-auto bg-transparent p-0 flex items-center gap-2">
+                                <TabsTrigger value="profile" className="group relative flex items-center gap-2 rounded-xl bg-transparent px-4 py-2 text-sm font-medium text-slate-400 transition-all hover:text-slate-200 data-[state=active]:bg-[#111214] data-[state=active]:text-[#e5e1e4] border border-transparent data-[state=active]:border-white/[0.06]">
+                                    <User className="h-4 w-4" />
+                                    <span>Profile</span>
                                 </TabsTrigger>
-                                <TabsTrigger value="organization" className="gap-2">
-                                    <Building2 className="h-4 w-4" /> Organization
+
+                                <TabsTrigger value="organization" className="group relative flex items-center gap-2 rounded-xl bg-transparent px-4 py-2 text-sm font-medium text-slate-400 transition-all hover:text-slate-200 data-[state=active]:bg-[#111214] data-[state=active]:text-[#e5e1e4] border border-transparent data-[state=active]:border-white/[0.06]">
+                                    <Building2 className="h-4 w-4" />
+                                    <span>Organization</span>
                                 </TabsTrigger>
-                                <TabsTrigger value="team" className="gap-2">
-                                    <Users className="h-4 w-4" /> Team
+
+                                <TabsTrigger value="team" className="group relative flex items-center gap-2 rounded-xl bg-transparent px-4 py-2 text-sm font-medium text-slate-400 transition-all hover:text-slate-200 data-[state=active]:bg-[#111214] data-[state=active]:text-[#e5e1e4] border border-transparent data-[state=active]:border-white/[0.06]">
+                                    <Users className="h-4 w-4" />
+                                    <span>Team Members</span>
                                 </TabsTrigger>
                             </TabsList>
+                        </div>
 
-                            <TabsContent value="profile">
-                                <ProfileTab user={user} />
-                            </TabsContent>
-                            <TabsContent value="organization">
-                                <OrgTab />
-                            </TabsContent>
-                            <TabsContent value="team">
-                                <TeamTab />
-                            </TabsContent>
-                        </Tabs>
-                    </div>
-                </main>
-            </div>
+                        <TabsContent value="profile" className="outline-none m-0">
+                            <ProfileTab user={user} />
+                        </TabsContent>
+                        <TabsContent value="organization" className="outline-none m-0">
+                            <OrgTab existingOrg={org} setExistingOrg={setOrg}/>
+                        </TabsContent>
+                        <TabsContent value="team" className="outline-none m-0">
+                            <TeamTab orgSlug={org?.slug} />
+                        </TabsContent>
+                    </Tabs>
+                </div>
+            </main>
         </div>
     );
 }
 
-/* ── Pending Invites Banner ─────────────────────────────────────────────── */
+/*  Pending Invites Banner  */
 
 interface Invite {
     id: number;
@@ -133,7 +142,7 @@ function PendingInvitesBanner() {
             const data = await getMyInvites();
             setInvites(data.invites || []);
         } catch {
-            // No invites or error
+            // Silence catch
         } finally {
             setLoading(false);
         }
@@ -170,50 +179,48 @@ function PendingInvitesBanner() {
     };
 
     if (loading || invites.length === 0) return msg ? (
-        <div className="max-w-3xl">
+        <div className="max-w-6xl mb-4">
             <StatusMessage message={msg.text} type={msg.type} />
         </div>
     ) : null;
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-3 mb-6">
             {msg && <StatusMessage message={msg.text} type={msg.type} />}
             {invites.map((invite) => (
-                <Card key={invite.id} className="border-primary/30 bg-primary/5">
-                    <CardContent className="flex items-center justify-between py-4 px-5">
+                <Card key={invite.id} className="border-white/[0.06] bg-[#111214] rounded-2xl">
+                    <CardContent className="flex flex-wrap items-center justify-between py-4 px-5 gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-                                <Mail className="h-5 w-5 text-primary" />
+                            <div className="h-9 w-9 rounded-xl bg-[#0d0e10] border border-white/[0.06] flex items-center justify-center">
+                                <Mail className="h-4 w-4 text-slate-400" />
                             </div>
-                            <div>
-                                <p className="text-sm font-medium">
-                                    <span className="text-primary">{invite.inviter_name || invite.inviter_email}</span>
-                                    {' '}invited you to join{' '}
-                                    <span className="font-semibold">{invite.org_name}</span>
+                            <div className="space-y-0.5 text-sm">
+                                <p className="text-slate-300">
+                                    <span className="text-white font-semibold">{invite.inviter_name || invite.inviter_email}</span> invited you to join <span className="text-white font-semibold">{invite.org_name}</span>
                                 </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Role: <Badge variant="outline" className="text-[10px] h-4 px-1.5 capitalize ml-1">{invite.role}</Badge>
+                                <p className="text-xs text-slate-500">
+                                    Role: <span className="text-slate-400 capitalize">{invite.role}</span>
                                 </p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
                             <Button
                                 size="sm"
-                                variant="outline"
-                                className="text-red-400 border-red-800/50 hover:bg-red-950/30 hover:text-red-300"
+                                variant="ghost"
+                                className="h-9 text-sm text-red-400 hover:bg-red-500/10 rounded-xl px-4"
                                 onClick={() => handleDecline(invite.id)}
                                 disabled={actionLoading === invite.id}
                             >
-                                {actionLoading === invite.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}
+                                {actionLoading === invite.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-4 w-4 mr-1.5" />}
                                 Decline
                             </Button>
                             <Button
                                 size="sm"
-                                className="bg-primary hover:bg-primary/90"
+                                className="h-9 text-sm bg-white hover:bg-slate-200 text-zinc-950 font-semibold rounded-xl px-4"
                                 onClick={() => handleAccept(invite.id)}
                                 disabled={actionLoading === invite.id}
                             >
-                                {actionLoading === invite.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+                                {actionLoading === invite.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />}
                                 Accept
                             </Button>
                         </div>
@@ -224,7 +231,7 @@ function PendingInvitesBanner() {
     );
 }
 
-/* ── Profile Tab ────────────────────────────────────────────────────────── */
+/* Profile Tab */
 
 function ProfileTab({ user }: { user: any; }) {
     const [name, setName] = useState(user?.name || '');
@@ -237,7 +244,7 @@ function ProfileTab({ user }: { user: any; }) {
         setMsg(null);
         try {
             await updateProfile(name.trim());
-            setMsg({ text: 'Profile updated successfully!', type: 'success' });
+            setMsg({ text: 'Profile updated successfully.', type: 'success' });
         } catch (err: any) {
             setMsg({ text: err.response?.data?.detail || 'Failed to update profile.', type: 'error' });
         } finally {
@@ -246,38 +253,40 @@ function ProfileTab({ user }: { user: any; }) {
     };
 
     return (
-        <Card className="border-border">
-            <CardHeader>
-                <CardTitle>User Profile</CardTitle>
-                <CardDescription>Your personal info and preferences</CardDescription>
+        <Card className="border-white/[0.06] bg-[#111214] rounded-2xl overflow-hidden">
+            <CardHeader className="border-b border-white/[0.06] bg-[#0d0e10] py-5 px-6">
+                <CardTitle className="text-base font-semibold text-slate-200">User Profile</CardTitle>
+                <CardDescription className="text-sm text-slate-400">Your personal info and preferences</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center text-xl font-bold text-primary">
+            <CardContent className="p-6 space-y-6">
+                <div className="flex items-center gap-4 bg-[#09090b] p-4 rounded-2xl border border-white/[0.06]">
+                    <div className="h-12 w-12 rounded-xl bg-[#0d0e10] border border-white/[0.06] flex items-center justify-center text-base font-bold text-slate-200">
                         {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? '?'}
                     </div>
-                    <div>
-                        <p className="font-medium">{user?.name || 'No name set'}</p>
-                        <p className="text-sm text-muted-foreground">{user?.email}</p>
+                    <div className="space-y-0.5 text-sm">
+                        <p className="font-semibold text-slate-200">{user?.name || 'No name set'}</p>
+                        <p className="text-slate-400 font-mono text-xs">{user?.email}</p>
                     </div>
                 </div>
 
-                <div className="grid gap-4 max-w-sm">
+                <div className="grid gap-5 max-w-md text-sm">
                     <div className="space-y-2">
-                        <Label>Display Name</Label>
-                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+                        <Label className="text-slate-300 font-medium">Display Name</Label>
+                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="bg-[#09090b] border-white/[0.06] focus:border-slate-400 h-10 rounded-xl" />
                     </div>
                     <div className="space-y-2">
-                        <Label>Email</Label>
-                        <Input value={user?.email || ''} disabled className="opacity-60" />
-                        <p className="text-xs text-muted-foreground">Email changes are managed through your auth provider</p>
+                        <Label className="text-slate-300 font-medium">Email</Label>
+                        <Input value={user?.email || ''} disabled className="bg-[#09090b]/50 border-white/[0.04] text-slate-500 h-10 rounded-xl font-mono text-xs" />
+                        <p className="text-xs text-slate-500">Email changes are managed through your auth provider</p>
                     </div>
                     <div className="space-y-2">
-                        <Label>User ID</Label>
-                        <Input value={user?.id || ''} disabled className="opacity-60 font-mono text-xs" />
+                        <Label className="text-slate-300 font-medium">User ID</Label>
+                        <Input value={user?.id || ''} disabled className="bg-[#09090b]/50 border-white/[0.04] text-slate-500 h-10 rounded-xl font-mono text-xs" />
                     </div>
+                    
                     {msg && <StatusMessage message={msg.text} type={msg.type} />}
-                    <Button className="w-fit" onClick={handleSave} disabled={saving || !name.trim()}>
+                    
+                    <Button className="w-fit h-10 bg-white hover:bg-slate-200 text-zinc-950 font-semibold rounded-xl px-5" onClick={handleSave} disabled={saving || !name.trim()}>
                         {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                         Save Changes
                     </Button>
@@ -287,30 +296,17 @@ function ProfileTab({ user }: { user: any; }) {
     );
 }
 
-/* ── Organization Tab ───────────────────────────────────────────────────── */
+/*  Organization Tab */
 
-function OrgTab() {
-    const [orgName, setOrgName] = useState('');
-    const [existingOrg, setExistingOrg] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+function OrgTab({ existingOrg, setExistingOrg }: { existingOrg: any; setExistingOrg: React.Dispatch<any>; }) {
+    const [orgName, setOrgName] = useState(existingOrg?.name || '');
+    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error'; } | null>(null);
 
-    const fetchOrg = useCallback(async () => {
-        try {
-            const data = await getOrganization();
-            if (data.org) {
-                setExistingOrg(data.org);
-                setOrgName(data.org.name);
-            }
-        } catch {
-            // No org yet
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => { fetchOrg(); }, [fetchOrg]);
+    useEffect(() => {
+        setOrgName(existingOrg?.name || '');
+    }, [existingOrg]);
 
     const handleSave = async () => {
         if (!orgName.trim()) return;
@@ -319,11 +315,12 @@ function OrgTab() {
         try {
             if (existingOrg) {
                 await updateOrganization(orgName.trim());
-                setMsg({ text: 'Organization updated!', type: 'success' });
+                setMsg({ text: 'Organization updated successfully.', type: 'success' });
+                setExistingOrg({ ...existingOrg, name: orgName.trim() });
             } else {
                 const data = await createOrganization(orgName.trim());
                 setExistingOrg({ id: data.org_id, name: data.name, slug: data.slug });
-                setMsg({ text: `Organization "${data.name}" created!`, type: 'success' });
+                setMsg({ text: `Organization "${data.name}" created.`, type: 'success' });
             }
         } catch (err: any) {
             setMsg({ text: err.response?.data?.detail || 'Failed to save organization.', type: 'error' });
@@ -334,50 +331,50 @@ function OrgTab() {
 
     if (loading) {
         return (
-            <Card className="border-border">
-                <CardContent className="flex items-center justify-center py-12">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </CardContent>
+            <Card className="border-white/[0.06] bg-[#111214] h-48 flex items-center justify-center rounded-2xl">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
             </Card>
         );
     }
 
     return (
-        <Card className="border-border">
-            <CardHeader>
-                <CardTitle>Organization</CardTitle>
-                <CardDescription>
+        <Card className="border-white/[0.06] bg-[#111214] rounded-2xl overflow-hidden">
+            <CardHeader className="border-b border-white/[0.06] bg-[#0d0e10] py-5 px-6">
+                <CardTitle className="text-base font-semibold text-slate-200">Organization</CardTitle>
+                <CardDescription className="text-sm text-slate-400">
                     {existingOrg ? `Managing "${existingOrg.name}"` : 'Create a team workspace'}
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="grid gap-4 max-w-sm">
+            <CardContent className="p-6 space-y-6">
+                <div className="grid gap-5 max-w-md text-sm">
                     <div className="space-y-2">
-                        <Label>Organization Name</Label>
-                        <Input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="My Team" />
+                        <Label className="text-slate-300 font-medium">Organization Name</Label>
+                        <Input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="e.g. Acme Corp" className="bg-[#09090b] border-white/[0.06] focus:border-slate-400 h-10 rounded-xl" />
                     </div>
                     {existingOrg && (
                         <div className="space-y-2">
-                            <Label>Slug</Label>
-                            <Input value={existingOrg.slug} disabled className="opacity-60 font-mono text-sm" />
+                            <Label className="text-slate-300 font-medium">Organization Slug</Label>
+                            <Input value={existingOrg.slug} disabled className="bg-[#09090b]/50 border-white/[0.04] text-slate-500 h-10 rounded-xl font-mono text-xs" />
                         </div>
                     )}
+                    
                     {msg && <StatusMessage message={msg.text} type={msg.type} />}
-                    <Button className="w-fit" onClick={handleSave} disabled={saving || !orgName.trim()}>
+                    
+                    <Button className="w-fit h-10 bg-white hover:bg-slate-200 text-zinc-950 font-semibold rounded-xl px-5" onClick={handleSave} disabled={saving || !orgName.trim()}>
                         {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                         {existingOrg ? 'Update Organization' : 'Create Organization'}
                     </Button>
                 </div>
 
-                <div className="pt-4 border-t border-border">
-                    <p className="text-sm text-muted-foreground mb-2">
-                        Organizations let you share database connections and query history with your team.
-                        Members can be assigned roles to control access.
+                <div className="pt-5 border-t border-white/[0.06] text-sm space-y-3">
+                    <p className="text-slate-400 leading-relaxed">
+                        Organizations let you share database connections and query history securely with team members. 
+                        Assign clear workspace permissions to control structural access paths.
                     </p>
                     <div className="flex gap-2 flex-wrap">
                         {['Owner', 'Admin', 'Editor', 'Viewer'].map((role) => (
-                            <Badge key={role} variant="outline" className="text-xs">
-                                <Shield className="h-3 w-3 mr-1" /> {role}
+                            <Badge key={role} variant="outline" className="text-xs bg-[#09090b] border-white/[0.06] text-slate-300 font-normal px-2.5 py-1 rounded-full">
+                                <Shield className="h-3 w-3 mr-1.5 text-slate-400" /> {role}
                             </Badge>
                         ))}
                     </div>
@@ -387,7 +384,7 @@ function OrgTab() {
     );
 }
 
-/* ── Team Tab ───────────────────────────────────────────────────────────── */
+/*  Team Tab   */
 
 interface TeamMember {
     id: string;
@@ -396,7 +393,7 @@ interface TeamMember {
     role: string;
 }
 
-function TeamTab() {
+function TeamTab({ orgSlug }: { orgSlug: string | undefined }) {
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('viewer');
     const [copied, setCopied] = useState(false);
@@ -410,16 +407,21 @@ function TeamTab() {
             const data = await getTeamMembers();
             setMembers(data.members || []);
         } catch {
-            // No org or error
+            // Error pipeline fallback
         } finally {
             setLoading(false);
         }
     }, []);
 
-    useEffect(() => { fetchMembers(); }, [fetchMembers]);
+    useEffect(() => { fetchMembers(); }, [fetchMembers]); 
 
     const handleCopyInvite = () => {
-        navigator.clipboard.writeText(`Join my Intelliquery team: ${window.location.origin}/sign-up`);
+        if (!orgSlug) {
+            setMsg({ text: "Create an organization first to generate a workspace link.", type: "error" });
+            return;
+        }
+        const inviteUrl = `${window.location.origin}/invite/${orgSlug}`;
+        navigator.clipboard.writeText(inviteUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -433,81 +435,91 @@ function TeamTab() {
             setMsg({ text: data.message, type: 'success' });
             setInviteEmail('');
         } catch (err: any) {
-            setMsg({ text: err.response?.data?.detail || 'Failed to invite member.', type: 'error' });
+            setMsg({ text: err.response?.data?.detail || 'Failed to send invite.', type: 'error' });
         } finally {
             setInviting(false);
         }
     };
 
     return (
-        <Card className="border-border">
-            <CardHeader>
-                <CardTitle>Team Members</CardTitle>
-                <CardDescription>Invite and manage your team</CardDescription>
+        <Card className="border-white/[0.06] bg-[#111214] rounded-2xl overflow-hidden">
+            <CardHeader className="border-b border-white/[0.06] bg-[#0d0e10] py-5 px-6">
+                <CardTitle className="text-base font-semibold text-slate-200">Team Members</CardTitle>
+                <CardDescription className="text-sm text-slate-400">Invite and manage account access configurations for your workspace.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                {/* Invite */}
-                <div className="max-w-md space-y-3">
-                    <Label>Invite by Email</Label>
-                    <div className="flex gap-2">
+            <CardContent className="p-6 space-y-8">
+                
+                {/* Invite Form Action */}
+                <div className="max-w-xl space-y-3 text-sm">
+                    <Label className="text-slate-300 font-medium">Invite Member</Label>
+                    <div className="flex flex-wrap sm:flex-nowrap gap-2.5">
                         <Input
                             value={inviteEmail}
                             onChange={(e) => setInviteEmail(e.target.value)}
-                            placeholder="teammate@company.com"
+                            placeholder="colleague@company.com"
                             type="email"
-                            className="flex-1"
+                            className="bg-[#09090b] border-white/[0.06] focus:border-slate-400 h-10 rounded-xl"
                         />
                         <select
                             value={inviteRole}
                             onChange={(e) => setInviteRole(e.target.value)}
-                            className="px-3 py-2 rounded-md border border-border bg-background text-sm"
+                            className="h-10 px-3 rounded-xl border border-white/[0.06] bg-[#09090b] text-sm text-slate-300 focus:outline-none focus:border-slate-400 cursor-pointer min-w-[120px]"
                         >
                             <option value="viewer">Viewer</option>
                             <option value="editor">Editor</option>
                             <option value="admin">Admin</option>
                         </select>
-                        <Button onClick={handleInvite} disabled={!inviteEmail.trim() || inviting}>
-                            {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
-                            Invite
+                        <Button className="h-10 bg-white hover:bg-slate-200 text-zinc-950 font-semibold rounded-xl px-5 flex items-center gap-2 shrink-0" onClick={handleInvite} disabled={!inviteEmail.trim() || inviting}>
+                            {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                            <span>Send Invite</span>
                         </Button>
                     </div>
                     {msg && <StatusMessage message={msg.text} type={msg.type} />}
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={handleCopyInvite}>
-                        {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-                        {copied ? 'Copied!' : 'Copy invite link'}
+                    <Button variant="ghost" size="sm" className="h-9 border border-white/[0.06] bg-[#0d0e10] text-slate-300 hover:text-white rounded-xl px-4 flex items-center gap-2 text-xs font-normal" onClick={handleCopyInvite}>
+                        {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4 text-slate-400" />}
+                        <span>{copied ? 'Copied link to clipboard' : 'Copy invite link'}</span>
                     </Button>
                 </div>
 
-                {/* Members list */}
-                <div className="border-t border-border pt-4">
-                    <p className="text-sm font-medium mb-3">
-                        Current Members {members.length > 0 && `(${members.length})`}
-                    </p>
+                {/* Team Roster */}
+                <div className="border-t border-white/[0.06] pt-6 text-sm">
+                    <div className="flex justify-between items-center mb-4">
+                        <p className="font-semibold text-slate-300">Active Members</p>
+                        {members.length > 0 && (
+                            <span className="text-xs text-slate-500 font-mono bg-[#09090b] px-2 py-0.5 rounded-md border border-white/[0.04]">
+                                Count: {members.length}
+                            </span>
+                        )}
+                    </div>
+                    
                     {loading ? (
-                        <div className="flex justify-center py-4">
-                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <div className="flex justify-center py-8">
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
                         </div>
                     ) : members.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4">
-                            No team members yet. Create an organization first, then invite members.
-                        </p>
+                        <div className="text-center py-8 border border-dashed border-white/[0.06] bg-[#09090b]/40 rounded-2xl">
+                            <p className="text-slate-500 italic">No team members added yet.</p>
+                        </div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-1 gap-2.5">
                             {members.map((m) => (
-                                <div key={m.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary">
+                                <div key={m.id} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] bg-[#09090b] transition hover:bg-[#0d0e10]/40">
+                                    <div className="flex items-center gap-3.5">
+                                        <div className="h-9 w-9 rounded-xl bg-[#0d0e10] border border-white/[0.06] flex items-center justify-center text-sm font-bold text-slate-300">
                                             {m.name?.[0]?.toUpperCase() ?? m.email[0].toUpperCase()}
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-medium">{m.name || m.email}</p>
-                                            <p className="text-xs text-muted-foreground">{m.email}</p>
+                                        <div className="space-y-0.5">
+                                            <p className="font-semibold text-slate-200">{m.name || 'Invite Pending'}</p>
+                                            <p className="text-xs text-slate-500 font-mono">{m.email}</p>
                                         </div>
                                     </div>
-                                    <Badge variant="secondary" className="capitalize">{m.role}</Badge>
+                                    
+                                    <Badge className="text-xs font-normal bg-[#0d0e10] border border-white/[0.06] text-slate-300 px-3 py-0.5 rounded-full capitalize">
+                                        {m.role}
+                                    </Badge>
                                 </div>
                             ))}
                         </div>
