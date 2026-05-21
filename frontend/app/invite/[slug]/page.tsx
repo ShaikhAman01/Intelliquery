@@ -31,7 +31,7 @@ export default function InviteLandingPage({ params }: InvitePageProps) {
     setJoining(true);
     setError(null);
     try {
-      await api.post(`/team/join-via-slug/${slug}`);
+      await api.post(`/settings/team/join-via-slug/${slug}`);
       setSuccess(true);
       
       setTimeout(() => {
