@@ -33,10 +33,18 @@ interface SidebarProps {
   className?: string;
   onNavigate?: (section: 'chart' | 'results' | 'insights' | 'query') => void;
   onReplay?: (question: string, sql: string) => void;
+
+  collapsed?: boolean;
+  onToggle?: () => void;
 }
 
-export const Sidebar = ({ className = '', onNavigate, onReplay }: SidebarProps) => {
-  const { connections, activeConnectionId, setConnections, setActiveConnection } = useStore();
+export const Sidebar = ({
+  className = '',
+  onNavigate,
+  onReplay,
+  collapsed = false,
+  onToggle,
+}: SidebarProps) => {  const { connections, activeConnectionId, setConnections, setActiveConnection } = useStore();
   const { user } = useSession();
 
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);

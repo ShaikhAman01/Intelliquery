@@ -348,8 +348,17 @@ function DashboardContent() {
 
   return (
     <div className="relative flex h-[100dvh] overflow-hidden bg-[#0b0b0c] text-[#e5e1e4]">
-      <Sidebar className="hidden w-[260px] lg:flex" onNavigate={handleSectionSelect} onReplay={handleReplay} />
+const [sidebarOpen, setSidebarOpen] = useState(true);
 
+<>
+  <Sidebar
+    className={`${sidebarOpen ? 'w-[260px]' : 'w-[78px]'} hidden lg:flex transition-all duration-300`}
+    onNavigate={handleSectionSelect}
+    onReplay={handleReplay}
+    collapsed={!sidebarOpen}
+    onToggle={() => setSidebarOpen((prev) => !prev)}
+  />
+</>
       <div className="flex h-full min-w-0 flex-1 flex-col">
         <Header
           onReplay={handleReplay}
