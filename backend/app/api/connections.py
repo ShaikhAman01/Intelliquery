@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 from app.api.deps import get_db
@@ -37,6 +37,10 @@ class ConnectionTest(BaseModel):
     password: str
     db_name: str
     use_ssl: bool = False
+
+
+class ConnectionStatusUpdate(BaseModel):
+    is_active: bool
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -95,6 +99,7 @@ def create_connection(
             encrypted_password=encrypted_pw,
             db_name=conn_data.db_name,
             use_ssl=conn_data.use_ssl,
+            is_active=True,  # Default to active on creation
         )
 
         logger.info(f"Analyzing schema for {conn_data.host}...")
@@ -129,10 +134,8 @@ def list_connections(
     query = db.query(DbConnection)
 
     if current_user.org_id:
-        # Show all connections in the org
         query = query.filter(DbConnection.org_id == current_user.org_id)
     else:
-        # Show only user's own connections
         query = query.filter(DbConnection.user_id == current_user.id)
 
     return query.all()
@@ -145,6 +148,9 @@ def refresh_connection_schema(
     current_user: User = Depends(require_editor),
 ):
     connection = _get_user_connection(connection_id, current_user, db)
+
+    if not getattr(connection, 'is_active', True):
+        raise HTTPException(status_code=400, detail="Cannot refresh schema on a disabled database connection.")
 
     try:
         logger.info(f"Refreshing schema for {connection.name}...")
@@ -162,6 +168,29 @@ def refresh_connection_schema(
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Schema Sync Failed: {str(e)}")
+
+
+@router.patch("/{connection_id}/toggle")
+def toggle_connection_status(
+    connection_id: int,
+    status_data: ConnectionStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_editor),
+):
+    """Enable or disable a database connection layout without removing it."""
+    connection = _get_user_connection(connection_id, current_user, db)
+    
+    connection.is_active = status_data.is_active
+    db.commit()
+    db.refresh(connection)
+    
+    status_msg = "enabled" if connection.is_active else "disabled"
+    logger.info(f"Connection '{connection.name}' has been {status_msg} by user {current_user.email}")
+    return {
+        "status": "success",
+        "message": f"Connection configuration successfully {status_msg}.",
+        "is_active": connection.is_active
+    }
 
 
 @router.delete("/{connection_id}")

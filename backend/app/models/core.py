@@ -109,6 +109,8 @@ class DbConnection(Base):
     organization = relationship("Organization", back_populates="connections")
     queries = relationship("QueryHistory", back_populates="connection")
 
+    is_active = Column(Boolean, default=True, nullable=False)
+
 
 class QueryHistory(Base):
     __tablename__ = "query_history"

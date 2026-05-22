@@ -15,6 +15,11 @@ export interface Connection {
   name: string;
   db_type: string;
   host: string;
+  port: string;
+  username: string;
+  db_name: string;
+  use_ssl: boolean;
+  is_active?: boolean;
 }
 
 interface AppState {

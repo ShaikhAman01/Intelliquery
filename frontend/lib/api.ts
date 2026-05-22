@@ -1,8 +1,5 @@
 import axios from 'axios';
 
-// Relative URL — requests go to Next.js (localhost:3000) which proxies
-// them to the FastAPI backend via next.config.ts rewrites. This ensures
-// session cookies are sent (same-origin).
 const API_URL = '/api/v1';
 
 export const api = axios.create({
@@ -19,7 +16,6 @@ export const getConnections = async () => {
 };
 
 export const createConnection = async (data: Record<string, unknown>) => {
-  // user_id is now derived from session on server — strip it out
   const { user_id, ...connectionData } = data;
   const res = await api.post('/connections/', connectionData);
   return res.data;
@@ -32,6 +28,11 @@ export const testConnection = async (data: Record<string, unknown>) => {
 
 export const deleteConnection = async (id: number) => {
   const res = await api.delete(`/connections/${id}`);
+  return res.data;
+};
+
+export const toggleConnectionStatus = async (id: number, isActive: boolean) => {
+  const res = await api.patch(`/connections/${id}/toggle`, { is_active: isActive });
   return res.data;
 };
 
