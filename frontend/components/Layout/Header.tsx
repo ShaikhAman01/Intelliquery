@@ -5,12 +5,12 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from 
 import { Sidebar } from './Sidebar';
 
 type HeaderSection = 'chart' | 'results' | 'insights' | 'explainer';
-type NavigationSection = HeaderSection | 'query';
+type NavigationSection = HeaderSection | 'query' | 'schema' | 'snippets';
 
 type HeaderProps = {
   onHistory?: () => void;
   onReplay?: (question: string, sql: string) => void;
-  onSectionSelect?: (section: NavigationSection) => void;
+  onSectionSelect?: (section: any) => void;
   activeSection?: HeaderSection;
   children?: React.ReactNode;
 }
@@ -21,6 +21,17 @@ export const Header = ({
   onSectionSelect,
   children,
 }: HeaderProps) => {
+
+  const handleMobileViewChange = (view: 'query' | 'schema' | 'snippets') => {
+    if (onSectionSelect) {
+      if (view === 'query') {
+        onSectionSelect('query');
+      } else {
+        onSectionSelect(view);
+      }
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 flex flex-shrink-0 items-center justify-center px-4 py-5 md:px-8 md:py-6">
       <div className="absolute left-4 top-1/2 flex -translate-y-1/2 items-center gap-3 md:left-8">
@@ -33,7 +44,14 @@ export const Header = ({
           <SheetContent side="left" className="flex w-[280px] border-white/10 bg-[#0e0e10] p-0">
             <SheetTitle className="sr-only">Menu Dashboard Sidebar</SheetTitle>
             <SheetDescription className="sr-only">Provides database connection navigation</SheetDescription>
-            <Sidebar className="w-full h-full border-r-0" onNavigate={onSectionSelect} onReplay={onReplay} />
+            
+            <Sidebar 
+              className="w-full h-full border-r-0" 
+              activeView="query" 
+              onViewChange={handleMobileViewChange} 
+              onReplay={onReplay} 
+              collapsed={false}
+            />
           </SheetContent>
         </Sheet>
       </div>
