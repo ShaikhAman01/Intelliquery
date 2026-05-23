@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, JSON, DateTime, Boolean
 from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.sql import func
 from datetime import datetime
 
 Base = declarative_base()
@@ -139,3 +140,15 @@ class OrgInvite(Base):
     role = Column(Text, default="viewer")
     status = Column(Text, default="pending")  # pending, accepted, declined
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class SavedSnippet(Base):
+    __tablename__ = "saved_snippets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, index=True, nullable=True)
+    user_id = Column(String, index=True, nullable=False)
+    connection_id = Column(Integer, ForeignKey("db_connections.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    sql_text = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

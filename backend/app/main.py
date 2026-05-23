@@ -10,6 +10,7 @@ from app.api import history
 from app.api import voice
 from app.api import schema_explorer
 from app.api import settings as settings_api
+from app.api import snippets as snippets_api
 from app.middleware.rate_limiter import RateLimiterMiddleware
 
 from sqlalchemy import create_engine
@@ -161,6 +162,10 @@ app.include_router(
     tags=["Settings"],
 )
 
+app.include_router(
+    snippets_api.router, 
+    prefix="/api/v1/snippets", 
+    tags=["Snippets"])
 
 @app.get("/health")
 def health_check():

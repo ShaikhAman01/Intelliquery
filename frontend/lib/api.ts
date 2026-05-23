@@ -69,7 +69,7 @@ export const deleteHistory = async (id: number) => {
 // ── Schema ───────────────────────────────────────────────────────────────────
 
 export const getSchema = async (connectionId: number) => {
-  const res = await api.get(`/schema/${connectionId}/tables`);
+  const res = await api.get(`/schema/${connectionId}`);
   return res.data;
 };
 
@@ -143,5 +143,12 @@ export const acceptInvite = async (inviteId: number) => {
 
 export const declineInvite = async (inviteId: number) => {
   const res = await api.post(`/settings/team/invites/${inviteId}/decline`);
+  return res.data;
+};
+
+export const getSnippets = async (connectionId?: number) => {
+  const params: Record<string, unknown> = {};
+  if (connectionId) params.connection_id = connectionId;
+  const res = await api.get('/snippets/', { params });
   return res.data;
 };
