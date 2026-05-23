@@ -1,5 +1,6 @@
 "use client";
-
+import { useSession } from "@/lib/use-auth";
+import { LandingPage } from "@/components/Landing/landing-page";
 import { Header } from "@/components/Layout/Header";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { QueryInput } from "@/components/Query/QueryInput";
@@ -30,7 +31,6 @@ import {
   ChevronRight,
   MessageSquarePlus,
 } from "lucide-react";
-import { useSession } from "@/lib/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toaster";
@@ -50,29 +50,11 @@ export default function Dashboard() {
     );
   }
 
-  if (!session) return <LandingPage />;
-  return <DashboardContent />;
-}
+  if (!session) {
+    return <LandingPage />;
+  }
 
-function LandingPage() {
-  return (
-    <div className="min-h-screen bg-[#09090b] text-[#e5e1e4] flex flex-col relative">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-500/5 via-transparent to-transparent pointer-events-none" />
-      <div className="relative z-10 flex-1 flex items-center justify-center p-6 text-center">
-        <div className="max-w-md space-y-6">
-          <div className="mx-auto w-12 h-12 bg-[#111214] border border-white/[0.08] rounded-xl flex items-center justify-center shadow-lg">
-            <Database className="w-5 h-5 text-slate-300" />
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight text-white">Intelliquery</h1>
-          <p className="text-sm text-slate-400 leading-relaxed">Connect production environments and analyze schemas instantly via secure conversational paths.</p>
-          <div className="flex gap-3 justify-center pt-2">
-            <Button className="h-10 bg-white hover:bg-slate-200 text-zinc-950 font-semibold rounded-xl px-5" onClick={() => (window.location.href = "/sign-up")}>Get Started</Button>
-            <Button variant="ghost" className="h-10 border border-white/[0.06] bg-[#111214] text-slate-300 rounded-xl px-5" onClick={() => (window.location.href = "/sign-in")}>Sign In</Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <DashboardContent />;
 }
 
 function DashboardContent() {
