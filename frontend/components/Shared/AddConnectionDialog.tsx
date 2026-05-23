@@ -1,14 +1,26 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useStore } from '@/lib/store';
-import { createConnection } from '@/lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Loader2 } from 'lucide-react';
+import { useState } from "react";
+import { useStore } from "@/lib/store";
+import { createConnection } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, Loader2 } from "lucide-react";
 
 interface Props {
   trigger?: React.ReactNode;
@@ -18,10 +30,16 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
   const { addConnection } = useStore();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [dbUrl, setDbUrl] = useState('');
+  const [dbUrl, setDbUrl] = useState("");
   const [formData, setFormData] = useState({
-    name: '', db_type: 'postgres', host: 'localhost', port: '5432',
-    username: 'postgres', password: '', db_name: ''
+    name: "",
+    db_type: "postgres",
+    host: "localhost",
+    port: "5432",
+    username: "postgres",
+    password: "",
+    db_name: "",
+    use_ssl: false,
   });
 
   const handleUrlPaste = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,20 +47,20 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
     setDbUrl(url);
 
     try {
-      if (url.includes('://')) {
+      if (url.includes("://")) {
         const parsed = new URL(url);
-        let scheme = parsed.protocol.replace(':', '');
-        if (scheme === 'postgresql') scheme = 'postgres';
+        let scheme = parsed.protocol.replace(":", "");
+        if (scheme === "postgresql") scheme = "postgres";
 
-        if (['postgres', 'mysql'].includes(scheme)) {
-          setFormData(prev => ({
+        if (["postgres", "mysql"].includes(scheme)) {
+          setFormData((prev) => ({
             ...prev,
             db_type: scheme,
             host: parsed.hostname || prev.host,
-            port: parsed.port || (scheme === 'postgres' ? '5432' : '3306'),
+            port: parsed.port || (scheme === "postgres" ? "5432" : "3306"),
             username: parsed.username || prev.username,
             password: parsed.password || prev.password,
-            db_name: parsed.pathname.replace('/', '') || prev.db_name
+            db_name: parsed.pathname.replace("/", "") || prev.db_name,
           }));
         }
       }
@@ -53,11 +71,13 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
 
   const getErrorMessage = (err: unknown) => {
     if (err instanceof Error) return err.message;
-    if (typeof err === 'object' && err !== null) {
-      const response = (err as { response?: { data?: { detail?: unknown } } }).response;
-      if (typeof response?.data?.detail === 'string') return response.data.detail;
+    if (typeof err === "object" && err !== null) {
+      const response = (err as { response?: { data?: { detail?: unknown } } })
+        .response;
+      if (typeof response?.data?.detail === "string")
+        return response.data.detail;
     }
-    return 'Unknown error';
+    return "Unknown error";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,10 +85,16 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
     setLoading(true);
     try {
       const res = await createConnection(formData);
-      if (res.status === 'success') {
+      if (res.status === "success") {
         addConnection({
-          id: res.connection_id, name: formData.name,
-          db_type: formData.db_type, host: formData.host
+          id: res.connection_id,
+          name: formData.name,
+          db_type: formData.db_type,
+          host: formData.host,
+          port: formData.port || (formData.db_type === "postgres" ? "5432" : "3306"),
+          username: formData.username || "",
+          db_name: formData.db_name || "",
+          use_ssl: formData.use_ssl || false,
         });
         setOpen(false);
       }
@@ -87,13 +113,18 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button variant="outline" className="mt-4 h-12 w-full justify-center gap-3 rounded-xl border-white/10 bg-transparent text-[#c2c6d7] hover:bg-white/[0.04] hover:text-[#e5e1e4]">
+          <Button
+            variant="outline"
+            className="mt-4 h-12 w-full justify-center gap-3 rounded-xl border-white/10 bg-transparent text-[#c2c6d7] hover:bg-white/[0.04] hover:text-[#e5e1e4]"
+          >
             <Plus size={16} /> Add Connection
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="border-white/10 bg-[#1c1b1d] text-[#e5e1e4] sm:max-w-[425px]">
-        <DialogHeader><DialogTitle>Connect Database</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Connect Database</DialogTitle>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="space-y-2 border-b border-border pb-4">
             <Label>Paste Connection URL (Optional)</Label>
@@ -103,29 +134,97 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
               placeholder="postgres://user:pass@host:5432/dbname"
               className="text-xs font-mono"
             />
-            <p className="text-[10px] text-muted-foreground">Pasting a URL will automatically fill the fields below.</p>
+            <p className="text-[10px] text-muted-foreground">
+              Pasting a URL will automatically fill the fields below.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mt-2">
-            <div className="space-y-2"><Label>Name</Label><Input name="name" value={formData.name} onChange={handleChange} required placeholder="My DB" /></div>
-            <div className="space-y-2"><Label>Type</Label>
-              <Select value={formData.db_type} onValueChange={(val) => setFormData({ ...formData, db_type: val })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="postgres">PostgreSQL</SelectItem><SelectItem value="mysql">MySQL</SelectItem></SelectContent>
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                placeholder="My DB"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select
+                value={formData.db_type}
+                onValueChange={(val) =>
+                  setFormData({ ...formData, db_type: val })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="postgres">PostgreSQL</SelectItem>
+                  <SelectItem value="mysql">MySQL</SelectItem>
+                </SelectContent>
               </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>Host</Label><Input name="host" value={formData.host} onChange={handleChange} required placeholder="localhost" /></div>
-            <div className="space-y-2"><Label>Port</Label><Input name="port" value={formData.port} onChange={handleChange} required placeholder="5432" /></div>
+            <div className="space-y-2">
+              <Label>Host</Label>
+              <Input
+                name="host"
+                value={formData.host}
+                onChange={handleChange}
+                required
+                placeholder="localhost"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Port</Label>
+              <Input
+                name="port"
+                value={formData.port}
+                onChange={handleChange}
+                required
+                placeholder="5432"
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>User</Label><Input name="username" value={formData.username} onChange={handleChange} required placeholder="postgres" /></div>
-            <div className="space-y-2"><Label>DB Name</Label><Input name="db_name" value={formData.db_name} onChange={handleChange} required placeholder="sales" /></div>
+            <div className="space-y-2">
+              <Label>User</Label>
+              <Input
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                required
+                placeholder="postgres"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>DB Name</Label>
+              <Input
+                name="db_name"
+                value={formData.db_name}
+                onChange={handleChange}
+                required
+                placeholder="sales"
+              />
+            </div>
           </div>
-          <div className="space-y-2"><Label>Password</Label><Input name="password" value={formData.password} type="password" onChange={handleChange} required /></div>
+          <div className="space-y-2">
+            <Label>Password</Label>
+            <Input
+              name="password"
+              value={formData.password}
+              type="password"
+              onChange={handleChange}
+              required
+            />
+          </div>
           <Button type="submit" disabled={loading} className="w-full mt-2">
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Connect
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{" "}
+            Connect
           </Button>
         </form>
       </DialogContent>
