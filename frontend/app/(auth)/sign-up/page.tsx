@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import SignUp from "@/components/auth/sign-up";
+import { Loader2 } from "lucide-react";
 
 export default function SignUpPage() {
     return (
@@ -10,7 +12,14 @@ export default function SignUpPage() {
             </div>
 
             <div className="z-10 w-full">
-                <SignUp />
+                <Suspense fallback={
+                    <div className="flex flex-col items-center justify-center space-y-2 text-slate-400 mx-auto">
+                        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+                        <p className="text-sm tracking-wide">Preparing authorization setup...</p>
+                    </div>
+                }>
+                    <SignUp />
+                </Suspense>
             </div>
         </div>
     );

@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import SignIn from "@/components/auth/sign-in";
+import { Loader2 } from "lucide-react";
 
 export default function SignInPage() {
     return (
@@ -10,7 +12,14 @@ export default function SignInPage() {
             </div>
 
             <div className="z-10 w-full">
-                <SignIn />
+                <Suspense fallback={
+                    <div className="flex flex-col items-center justify-center space-y-2 text-slate-400 mx-auto">
+                        <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+                        <p className="text-sm tracking-wide">Loading secure portal...</p>
+                    </div>
+                }>
+                    <SignIn />
+                </Suspense>
             </div>
         </div>
     );
