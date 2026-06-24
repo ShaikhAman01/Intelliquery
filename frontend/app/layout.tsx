@@ -27,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans bg-[#09090b] text-[#e5e1e4] antialiased`}
       >
         <ThemeProvider defaultTheme="system" storageKey="intelliquery-theme">
           <ToastProvider>
