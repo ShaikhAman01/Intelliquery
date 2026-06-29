@@ -1,8 +1,9 @@
 "use client";
 
-import { Sparkles, AlertCircle, HelpCircle } from "lucide-react";
+import { Sparkles, AlertCircle, CheckCircle2, BarChart3 } from "lucide-react";
 import { useMemo } from "react";
 import { StatsCards } from "./StatsCards";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface InsightsPanelProps {
   data: Record<string, unknown>[];
@@ -10,44 +11,34 @@ interface InsightsPanelProps {
   insights?: any;
 }
 
-export const InsightsPanel = ({
-  data,
-  explanation,
-  insights,
-}: InsightsPanelProps) => {
+export const InsightsPanel = ({ data, explanation, insights }: InsightsPanelProps) => {
   if (!data || data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-        -- Operational data frame empty. Execute query to evaluate profiles.
-      </div>
+      <EmptyState
+        icon={BarChart3}
+        title="No insights yet"
+        description="Run a query to see AI-generated insights here."
+        size="sm"
+        className="h-full"
+      />
     );
   }
 
-  // ── Mathematical Engine (Processes database entries on the fly) ──
+  /* ── Statistical engine ──────────────────────────────────── */
   const telemetry = useMemo(() => {
     const keys = Object.keys(data[0]);
     const totalCells = data.length * keys.length;
 
     let nullCount = 0;
-    const numericMetrics: Record<
-      string,
-      { sum: number; values: number[]; max: number; min: number }
-    > = {};
+    const numericMetrics: Record<string, { sum: number; values: number[]; max: number; min: number }> = {};
 
     data.forEach((row) => {
       keys.forEach((key) => {
         const val = row[key];
-        if (val === null || val === undefined || val === "") {
-          nullCount++;
-        }
+        if (val === null || val === undefined || val === "") nullCount++;
         if (typeof val === "number" && !isNaN(val)) {
           if (!numericMetrics[key]) {
-            numericMetrics[key] = {
-              sum: 0,
-              values: [],
-              max: -Infinity,
-              min: Infinity,
-            };
+            numericMetrics[key] = { sum: 0, values: [], max: -Infinity, min: Infinity };
           }
           numericMetrics[key].sum += val;
           numericMetrics[key].values.push(val);
@@ -57,14 +48,10 @@ export const InsightsPanel = ({
       });
     });
 
-    const dataQualityIndex =
-      totalCells > 0
-        ? Math.round(((totalCells - nullCount) / totalCells) * 100)
-        : 100;
+    const quality = totalCells > 0 ? Math.round(((totalCells - nullCount) / totalCells) * 100) : 100;
     const numericKeys = Object.keys(numericMetrics);
-
-    // Choose primary numeric focus
     const focusKey = numericKeys[numericKeys.length - 1] || null;
+
     let computedAverage = 0;
     let computedPeak = 0;
     let anomalyScore = 0;
@@ -74,26 +61,20 @@ export const InsightsPanel = ({
       computedAverage = stats.sum / stats.values.length;
       computedPeak = stats.max;
 
-      // Find standard variance anomalies (items falling 1.5 deviations out from average)
       if (stats.values.length > 2) {
         const avg = computedAverage;
-        const squareDiffs = stats.values.map((v) => Math.pow(v - avg, 2));
-        const variance =
-          squareDiffs.reduce((a, b) => a + b, 0) / squareDiffs.length;
+        const variance = stats.values.reduce((acc, v) => acc + Math.pow(v - avg, 2), 0) / stats.values.length;
         const stdDev = Math.sqrt(variance);
-
         if (stdDev > 0) {
-          anomalyScore = stats.values.filter(
-            (v) => Math.abs(v - avg) > 1.5 * stdDev,
-          ).length;
+          anomalyScore = stats.values.filter((v) => Math.abs(v - avg) > 1.5 * stdDev).length;
         }
       }
     }
 
     return {
-      quality: dataQualityIndex,
+      quality,
       nulls: nullCount,
-      targetMetric: focusKey ? focusKey.replace(/_/g, " ") : "Records Key",
+      targetMetric: focusKey ? focusKey.replace(/_/g, " ") : "Records",
       average: computedAverage,
       peak: computedPeak,
       anomaliesFound: anomalyScore,
@@ -102,143 +83,130 @@ export const InsightsPanel = ({
   }, [data]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-5 h-full overflow-y-auto custom-scrollbar pr-1">
-      <div className="space-y-5">
-        {/* Dynamic Context Block */}
-        <div className="bg-[#0b0b0c]/60 rounded-2xl p-4 border border-white/[0.06] space-y-3">
-          <div className="flex items-center gap-2 text-xs text-purple-400 tracking-wide">
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_240px] gap-4 h-full overflow-y-auto custom-scrollbar pr-0.5">
+
+      {/* ── Left: analysis + stats + KPIs + alert ─────────── */}
+      <div className="space-y-4">
+
+        {/* AI Analysis summary */}
+        <div className="rounded-lg border border-border bg-base-2 p-4 space-y-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-brand uppercase tracking-wide">
             <Sparkles className="h-3.5 w-3.5" />
             <span>AI Analysis</span>
           </div>
-          <p className="text-[13px] leading-6 text-slate-300">
-            {insights?.summary ||
-              explanation ||
-              "Analysis complete. Query results processed successfully and key metrics were identified from the current dataset."}
+          <p className="text-[13px] leading-relaxed text-content-2">
+            {insights?.summary || explanation ||
+              "Analysis complete. Key metrics were identified from the current dataset."}
           </p>
         </div>
 
         <StatsCards data={data} />
 
-        {/* Live Mathematical Derived KPI Layer */}
+        {/* Live KPI tiles */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-white/[0.06] bg-[#131316] p-3.5">
-            <span className="text-xs font-medium text-slate-500 uppercase block tracking-wider">
-              Primary Metric
-            </span>
-            <p className="text-sm font-semibold text-slate-100 mt-1 truncate">
-              {telemetry.targetMetric}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.06] bg-[#131316] p-3.5">
-            <span className="text-xs font-medium text-slate-500 uppercase block tracking-wider">
-              Average Value
-            </span>
-            <p className="text-lg font-semibold text-[#4edea3] mt-1 tracking-tight">
-              {telemetry.average > 0
-                ? telemetry.average.toLocaleString(undefined, {
-                    maximumFractionDigits: 2,
-                  })
-                : telemetry.peak || data.length}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.06] bg-[#131316] p-3.5">
-            <span className="text-xs font-medium text-slate-500 uppercase block tracking-wider">
-              Highest Value
-            </span>
-            <p className="text-lg font-semibold text-amber-300 mt-1 tracking-tight">
-              {telemetry.peak > 0
-                ? telemetry.peak.toLocaleString()
-                : "Data Uniform"}
-            </p>
-          </div>
+          {[
+            {
+              label: "Primary Metric",
+              value: telemetry.targetMetric,
+              color: "text-content-1",
+              small: false,
+            },
+            {
+              label: "Average Value",
+              value: telemetry.average > 0
+                ? telemetry.average.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                : String(telemetry.peak || data.length),
+              color: "text-success",
+              small: true,
+            },
+            {
+              label: "Highest Value",
+              value: telemetry.peak > 0 ? telemetry.peak.toLocaleString() : "Uniform",
+              color: "text-warning",
+              small: true,
+            },
+          ].map(({ label, value, color, small }) => (
+            <div key={label} className="rounded-lg border border-border bg-base-2 p-3.5">
+              <span className="text-[11px] font-medium text-content-3 uppercase tracking-wider block mb-1.5">
+                {label}
+              </span>
+              <p className={`font-semibold truncate ${color} ${small ? 'text-[18px]' : 'text-[13px]'}`}>
+                {value}
+              </p>
+            </div>
+          ))}
         </div>
 
-        {/* Variable Structural Alerts */}
+        {/* Distribution alert */}
         {telemetry.anomaliesFound > 0 ? (
-          <div className="bg-amber-950/20 border border-amber-500/20 rounded-2xl p-3.5 flex items-start gap-2.5">
-            <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-            <div className="text-xs">
-              <span className="text-amber-400 font-bold uppercase block tracking-wide">
-                Unusual Data Pattern Detected
+          <div
+            className="flex items-start gap-2.5 rounded-lg p-3.5"
+            style={{ background: 'var(--ds-warning-muted)', border: '1px solid var(--ds-warning-border)' }}
+          >
+            <AlertCircle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+            <div className="text-[12px]">
+              <span className="text-warning font-semibold uppercase tracking-wide block">
+                Anomaly Detected
               </span>
-              <p className="text-slate-400 mt-0.5">
-                Found {telemetry.anomaliesFound} values outside the expected
-                statistical range for this dataset.
+              <p className="text-content-2 mt-0.5">
+                {telemetry.anomaliesFound} value{telemetry.anomaliesFound !== 1 ? 's' : ''} fall outside the expected statistical range.
               </p>
             </div>
           </div>
         ) : (
-          <div className="bg-zinc-900/40 border border-white/[0.06] rounded-2xl p-3.5 flex items-start gap-2.5">
-            <HelpCircle className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
-            <div className="text-xs">
-              <span className="text-slate-400 font-semibold block">
-                Normal Distribution Detected
-              </span>
-              <p className="text-slate-500 mt-0.5">
-                The dataset appears evenly distributed with no major anomalies
-                detected.
+          <div className="flex items-start gap-2.5 rounded-lg border border-border bg-base-2 p-3.5">
+            <CheckCircle2 className="h-4 w-4 text-content-3 flex-shrink-0 mt-0.5" />
+            <div className="text-[12px]">
+              <span className="text-content-2 font-semibold block">Normal Distribution</span>
+              <p className="text-content-3 mt-0.5">
+                No major anomalies detected in this dataset.
               </p>
             </div>
           </div>
         )}
       </div>
 
-{/* Structural Scorecard Layout */}
-<div className="bg-[#101012] rounded-2xl border border-white/[0.06] p-5 text-sm space-y-5">
-  <div>
-    <span className="block mb-2 text-[11px] font-medium tracking-wide text-slate-500">
-      Data Quality
-    </span>
+      {/* ── Right: quality scorecard ───────────────────────── */}
+      <div className="rounded-lg border border-border bg-base-2 p-5 space-y-5 h-fit">
 
-    <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-300">
-      <span>Completeness</span>
-      <span>{telemetry.quality}%</span>
-    </div>
+        {/* Progress */}
+        <div>
+          <span className="block mb-2.5 text-[11px] font-medium tracking-wide text-content-3 uppercase">
+            Data Quality
+          </span>
+          <div className="mb-2 flex items-center justify-between text-[12px] font-medium">
+            <span className="text-content-2">Completeness</span>
+            <span className="text-content-1">{telemetry.quality}%</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-base-4">
+            <div
+              className="h-full rounded-full bg-brand transition-[width] duration-700"
+              style={{ width: `${telemetry.quality}%` }}
+            />
+          </div>
+        </div>
 
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#1b1b1e]">
-      <div
-        className="h-full rounded-full bg-gradient-to-r from-primary/80 to-primary transition-all duration-700"
-        style={{ width: `${telemetry.quality}%` }}
-      />
-    </div>
-  </div>
-
-  <div className="space-y-3 border-t border-white/[0.06] pt-4 text-xs">
-    <div className="flex items-center justify-between">
-      <span className="text-slate-500">Rows Returned</span>
-      <span className="font-medium text-slate-100">
-        {data.length.toLocaleString()}
-      </span>
-    </div>
-
-    <div className="flex items-center justify-between">
-      <span className="text-slate-500">Columns</span>
-      <span className="font-medium text-slate-100">
-        {telemetry.keys.length}
-      </span>
-    </div>
-
-    <div className="flex items-center justify-between">
-      <span className="text-slate-500">Missing Values</span>
-      <span className="font-medium text-slate-100">
-        {telemetry.nulls}
-      </span>
-    </div>
-
-    <div className="flex items-center justify-between">
-      <span className="text-slate-500">Anomalies</span>
-      <span
-        className={`font-medium ${
-          telemetry.anomaliesFound > 0
-            ? "text-amber-300"
-            : "text-emerald-300"
-        }`}
-      >
-        {telemetry.anomaliesFound}
-      </span>
-    </div>
-  </div>
-</div>
+        {/* Stats */}
+        <div className="space-y-3 border-t border-border pt-4 text-[12px]">
+          {[
+            { label: "Rows Returned", value: data.length.toLocaleString() },
+            { label: "Columns", value: telemetry.keys.length },
+            { label: "Missing Values", value: telemetry.nulls },
+            {
+              label: "Anomalies",
+              value: telemetry.anomaliesFound,
+              valueClass: telemetry.anomaliesFound > 0 ? "text-warning" : "text-success",
+            },
+          ].map(({ label, value, valueClass }) => (
+            <div key={label} className="flex items-center justify-between">
+              <span className="text-content-3">{label}</span>
+              <span className={`font-medium text-content-1 ${valueClass ?? ''}`}>
+                {value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useStore } from "@/lib/store";
 import { createConnection } from "@/lib/api";
 import {
@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Loader2 } from "lucide-react";
+import { FormError } from "@/components/ui/form-error";
+import { Plus, Loader2, Link2, ShieldCheck } from "lucide-react";
 
 interface Props {
   trigger?: React.ReactNode;
@@ -28,8 +30,10 @@ interface Props {
 
 export function AddConnectionDialog({ trigger }: Props = {}) {
   const { addConnection } = useStore();
+  const formRef = useRef<HTMLFormElement>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [dbUrl, setDbUrl] = useState("");
   const [formData, setFormData] = useState({
     name: "",
@@ -61,6 +65,7 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
             username: parsed.username || prev.username,
             password: parsed.password || prev.password,
             db_name: parsed.pathname.replace("/", "") || prev.db_name,
+            use_ssl: parsed.searchParams.get("sslmode") === "require" || prev.use_ssl,
           }));
         }
       }
@@ -70,19 +75,20 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
   };
 
   const getErrorMessage = (err: unknown) => {
-    if (err instanceof Error) return err.message;
     if (typeof err === "object" && err !== null) {
       const response = (err as { response?: { data?: { detail?: unknown } } })
         .response;
       if (typeof response?.data?.detail === "string")
         return response.data.detail;
     }
+    if (err instanceof Error) return err.message;
     return "Unknown error";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
     try {
       const res = await createConnection(formData);
       if (res.status === "success") {
@@ -99,7 +105,7 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
         setOpen(false);
       }
     } catch (err: unknown) {
-      alert("Failed: " + getErrorMessage(err));
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -114,49 +120,60 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
       <DialogTrigger asChild>
         {trigger || (
           <Button
-            variant="outline"
-            className="mt-4 h-12 w-full justify-center gap-3 rounded-xl border-white/10 bg-transparent text-[#c2c6d7] hover:bg-white/[0.04] hover:text-[#e5e1e4]"
+            variant="ghost"
+            className="w-full justify-start gap-2 text-content-3 hover:text-content-1"
           >
-            <Plus size={16} /> Add Connection
+            <Plus className="h-4 w-4" />
+            Add Connection
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="border-white/10 bg-[#1c1b1d] text-[#e5e1e4] sm:max-w-[425px]">
+
+      <DialogContent showCloseButton>
         <DialogHeader>
           <DialogTitle>Connect Database</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          <div className="space-y-2 border-b border-border pb-4">
-            <Label>Paste Connection URL (Optional)</Label>
+
+        <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4 px-5 py-4">
+          {/* Connection URL shortcut */}
+          <div className="space-y-1.5">
+            <Label className="gap-1.5">
+              <Link2 className="h-3.5 w-3.5 text-content-3" />
+              Connection URL
+              <span className="text-content-3 font-normal">(optional)</span>
+            </Label>
             <Input
               value={dbUrl}
               onChange={handleUrlPaste}
               placeholder="postgres://user:pass@host:5432/dbname"
-              className="text-xs font-mono"
+              className="font-mono text-[12px]"
             />
-            <p className="text-[10px] text-muted-foreground">
-              Pasting a URL will automatically fill the fields below.
+            <p className="text-[11px] text-content-3 leading-relaxed">
+              Pasting a URL auto-fills the fields below.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div className="space-y-2">
-              <Label>Name</Label>
+          {/* Divider */}
+          <div className="h-px bg-[var(--ds-border-subtle)]" />
+
+          {/* Name + Type */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="conn-name">Name</Label>
               <Input
+                id="conn-name"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
                 required
-                placeholder="My DB"
+                placeholder="My Database"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Type</Label>
               <Select
                 value={formData.db_type}
-                onValueChange={(val) =>
-                  setFormData({ ...formData, db_type: val })
-                }
+                onValueChange={(val) => setFormData({ ...formData, db_type: val })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -168,10 +185,13 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Host</Label>
+
+          {/* Host + Port */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="conn-host">Host</Label>
               <Input
+                id="conn-host"
                 name="host"
                 value={formData.host}
                 onChange={handleChange}
@@ -179,9 +199,10 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
                 placeholder="localhost"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Port</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="conn-port">Port</Label>
               <Input
+                id="conn-port"
                 name="port"
                 value={formData.port}
                 onChange={handleChange}
@@ -190,10 +211,13 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>User</Label>
+
+          {/* User + DB Name */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="conn-user">User</Label>
               <Input
+                id="conn-user"
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
@@ -201,20 +225,24 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
                 placeholder="postgres"
               />
             </div>
-            <div className="space-y-2">
-              <Label>DB Name</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="conn-db">Database</Label>
               <Input
+                id="conn-db"
                 name="db_name"
                 value={formData.db_name}
                 onChange={handleChange}
                 required
-                placeholder="sales"
+                placeholder="production"
               />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label>Password</Label>
+
+          {/* Password */}
+          <div className="space-y-1.5">
+            <Label htmlFor="conn-password">Password</Label>
             <Input
+              id="conn-password"
               name="password"
               value={formData.password}
               type="password"
@@ -222,11 +250,51 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
               required
             />
           </div>
-          <Button type="submit" disabled={loading} className="w-full mt-2">
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{" "}
-            Connect
-          </Button>
+
+          {/* SSL toggle */}
+          <label className="flex cursor-pointer items-center gap-3 rounded-md border border-border bg-base-0 px-3 py-2.5 hover:bg-base-1 transition-colors duration-[100ms]">
+            <input
+              type="checkbox"
+              checked={formData.use_ssl}
+              onChange={(e) => setFormData({ ...formData, use_ssl: e.target.checked })}
+              className="h-4 w-4 accent-[var(--ds-accent)] cursor-pointer"
+            />
+            <div className="flex items-center gap-1.5 text-[13px] text-content-2">
+              <ShieldCheck className="h-3.5 w-3.5 text-brand" />
+              <span>Require SSL</span>
+            </div>
+            <span className="ml-auto text-[11px] text-content-3">Needed for Neon, Supabase, RDS</span>
+          </label>
+
+          {/* Error */}
+          {error && <FormError message={error} />}
         </form>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={() => formRef.current?.requestSubmit()}
+            disabled={loading}
+            className="min-w-[88px]"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Connecting…
+              </>
+            ) : (
+              "Connect"
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -12,12 +12,16 @@ function Tabs({
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn("flex flex-col", className)}
       {...props}
     />
   )
 }
 
+/*
+  Underline-style list — no pill background.
+  Wrap this in a container with border-b to get the connected-underline effect.
+*/
 function TabsList({
   className,
   ...props
@@ -25,15 +29,16 @@ function TabsList({
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
-      className={cn(
-        "bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]",
-        className
-      )}
+      className={cn("flex items-center gap-5", className)}
       {...props}
     />
   )
 }
 
+/*
+  Each trigger sits -1px below the list so the 2px indicator
+  covers the container's border-b, creating the connected underline.
+*/
 function TabsTrigger({
   className,
   ...props
@@ -42,7 +47,25 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        /* Layout */
+        "relative -mb-px inline-flex items-center gap-1.5 whitespace-nowrap",
+        "pb-3 pt-1 px-0",
+        /* Typography */
+        "text-[13px] font-medium text-content-2",
+        /* Transitions */
+        "transition-colors duration-[100ms] outline-none",
+        /* Active */
+        "data-[state=active]:text-content-1",
+        /* Disabled */
+        "disabled:pointer-events-none disabled:opacity-50",
+        /* Icons */
+        "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        /* Underline indicator — scales in from 0 → 1 when active */
+        "after:absolute after:bottom-0 after:left-0 after:right-0",
+        "after:h-0.5 after:rounded-full after:bg-brand",
+        "after:scale-x-0 after:origin-center",
+        "after:transition-transform after:duration-[160ms] after:ease-[var(--ds-ease-out)]",
+        "data-[state=active]:after:scale-x-100",
         className
       )}
       {...props}

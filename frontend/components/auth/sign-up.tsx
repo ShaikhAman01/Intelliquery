@@ -29,7 +29,7 @@ export default function SignUp() {
     startTransition(async () => {
       const { error } = await authClient.signUp.email({ email, password, name });
       if (error) {
-        setError(error.message || "Something went wrong");
+        setError(error.message || "Something went wrong. Please try again.");
       } else {
         router.push(redirectTo);
       }
@@ -37,10 +37,7 @@ export default function SignUp() {
   };
 
   const handleGoogleSignIn = async () => {
-    await authClient.signIn.social({
-      provider: "google",
-      callbackURL: redirectTo,
-    });
+    await authClient.signIn.social({ provider: "google", callbackURL: redirectTo });
   };
 
   return (

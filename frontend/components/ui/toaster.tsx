@@ -17,7 +17,25 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
-export const ToastProvider = ({ children }: { children: React.ReactNode; }) => {
+const typeStyles: Record<ToastType, { icon: React.ElementType; border: string; iconColor: string }> = {
+    success: {
+        icon: CheckCircle,
+        border: 'border-[var(--ds-success-border)]',
+        iconColor: 'text-success',
+    },
+    error: {
+        icon: AlertCircle,
+        border: 'border-[var(--ds-error-border)]',
+        iconColor: 'text-error',
+    },
+    info: {
+        icon: Info,
+        border: 'border-[var(--ds-info-border)]',
+        iconColor: 'text-[var(--ds-info)]',
+    },
+};
+
+export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
     const [toasts, setToasts] = useState<Toast[]>([]);
 
     const toast = useCallback((message: string, type: ToastType = 'info') => {
@@ -33,29 +51,36 @@ export const ToastProvider = ({ children }: { children: React.ReactNode; }) => {
             {children}
             <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
                 <AnimatePresence>
-                    {toasts.map((t) => (
-                        <motion.div
-                            key={t.id}
-                            initial={{ opacity: 0, x: 50, scale: 0.9 }}
-                            animate={{ opacity: 1, x: 0, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                            className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border min-w-[250px] bg-card ${t.type === 'success' ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-emerald-500/10' :
-                                t.type === 'error' ? 'border-red-500/30 text-red-600 dark:text-red-400 shadow-red-500/10' :
-                                    'border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-blue-500/10'
-                                }`}
-                        >
-                            {t.type === 'success' && <CheckCircle className="h-5 w-5 opacity-80" />}
-                            {t.type === 'error' && <AlertCircle className="h-5 w-5 opacity-80" />}
-                            {t.type === 'info' && <Info className="h-5 w-5 opacity-80" />}
-                            <span className="text-sm font-medium flex-1 text-foreground">{t.message}</span>
-                            <button
-                                onClick={() => setToasts(prev => prev.filter(toast => toast.id !== t.id))}
-                                className="opacity-40 hover:opacity-100 transition-opacity text-foreground"
+                    {toasts.map((t) => {
+                        const { icon: Icon, border, iconColor } = typeStyles[t.type];
+                        return (
+                            <motion.div
+                                key={t.id}
+                                initial={{ opacity: 0, x: 40, scale: 0.95 }}
+                                animate={{ opacity: 1, x: 0, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.16 } }}
+                                transition={{ duration: 0.22, ease: [0, 0, 0.2, 1] }}
+                                className={[
+                                    'pointer-events-auto flex items-center gap-3 px-4 py-3',
+                                    'rounded-lg border min-w-[260px] max-w-[380px]',
+                                    'bg-base-4',
+                                    border,
+                                ].join(' ')}
+                                style={{ boxShadow: 'var(--ds-shadow-xl)' }}
                             >
-                                <X className="h-4 w-4" />
-                            </button>
-                        </motion.div>
-                    ))}
+                                <Icon className={`h-4 w-4 flex-shrink-0 ${iconColor}`} />
+                                <span className="text-[13px] font-medium flex-1 text-content-1 leading-snug">
+                                    {t.message}
+                                </span>
+                                <button
+                                    onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+                                    className="text-content-3 hover:text-content-1 transition-colors duration-[100ms] flex-shrink-0"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </motion.div>
+                        );
+                    })}
                 </AnimatePresence>
             </div>
         </ToastContext.Provider>

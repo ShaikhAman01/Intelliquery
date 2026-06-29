@@ -4,76 +4,81 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   BarChart3, LineChartIcon, PieChartIcon, TrendingUp, LayoutGrid,
   Maximize2, Minimize2, Download, ImageDown, Table as TableIcon,
-  ArrowDownNarrowWide, ArrowUpWideNarrow, Filter
+  ArrowDownNarrowWide, ArrowUpWideNarrow, Filter,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EmptyState } from '@/components/ui/empty-state';
 import { motion, AnimatePresence } from 'motion/react';
 
-// ── Color palette (dark-theme friendly) ─────────────────────────────────
+/* ── Design-aligned chart palette ──────────────────────────────────────
+   Order matches: brand → success → warning → error → info → extended  */
 const CHART_COLORS = [
-  '#afc6ff', '#d0bcff', '#4edea3', '#7dd3fc',
-  '#fbbf24', '#fb7185', '#a78bfa', '#34d399',
-  '#f97316', '#22d3ee', '#f472b6', '#c084fc',
+  '#3b82f6',  // Blue (accent-hover)
+  '#22c55e',  // Green (success)
+  '#f59e0b',  // Amber (warning)
+  '#f87171',  // Red (error)
+  '#60a5fa',  // Light blue (info)
+  '#e879f9',  // Fuchsia (chart-6)
+  '#34d399',  // Emerald
+  '#fbbf24',  // Yellow
+  '#f97316',  // Orange
+  '#22d3ee',  // Cyan
+  '#a78bfa',  // Violet
+  '#fb7185',  // Rose
 ];
 
-const GRID_COLOR = 'rgba(194, 198, 215, 0.12)';
-const AXIS_COLOR = '#a8adbd';
-const TOOLTIP_BG = '#1c1b1d';
-const TOOLTIP_BORDER = 'rgba(255, 255, 255, 0.14)';
+/* Recharts expects hex, not CSS vars */
+const GRID_COLOR   = 'rgba(255,255,255,0.05)';
+const AXIS_COLOR   = '#5e5e6a';  /* --ds-text-3 */
+const TOOLTIP_BG   = 'rgba(20,20,23,0.96)';  /* ~--ds-base-2 */
+const TOOLTIP_BORDER = 'rgba(255,255,255,0.10)';  /* --ds-border-moderate */
 
-// ── Types ───────────────────────────────────────────────────────────────
+/* ── Types ─────────────────────────────────────────────────────────── */
 type ChartType = 'bar' | 'line' | 'pie' | 'kpi' | 'area' | 'table';
-type ChartRow = Record<string, unknown>;
+type ChartRow  = Record<string, unknown>;
 
-interface TooltipEntry {
-  color?: string;
-  name?: string;
-  value?: unknown;
-}
-
-interface TooltipProps {
-  active?: boolean;
-  payload?: TooltipEntry[];
-  label?: unknown;
-}
+interface TooltipEntry { color?: string; name?: string; value?: unknown; }
+interface TooltipProps  { active?: boolean; payload?: TooltipEntry[]; label?: unknown; }
 
 interface ChartPanelProps {
   data: Record<string, unknown>[];
   chartRecommendation?: { chart_type: ChartType; reason?: string; };
 }
 
-// ── Chart Type Buttons ──────────────────────────────────────────────────
+/* ── Chart type button list ────────────────────────────────────────── */
 const CHART_TYPE_OPTIONS: { type: ChartType; icon: React.ElementType; label: string; }[] = [
-  { type: 'bar', icon: BarChart3, label: 'Bar' },
-  { type: 'line', icon: LineChartIcon, label: 'Line' },
-  { type: 'area', icon: TrendingUp, label: 'Area' },
-  { type: 'pie', icon: PieChartIcon, label: 'Pie' },
-  { type: 'kpi', icon: LayoutGrid, label: 'KPI' },
-  { type: 'table', icon: TableIcon, label: 'Table' },
+  { type: 'bar',   icon: BarChart3,      label: 'Bar'  },
+  { type: 'line',  icon: LineChartIcon,  label: 'Line' },
+  { type: 'area',  icon: TrendingUp,     label: 'Area' },
+  { type: 'pie',   icon: PieChartIcon,   label: 'Pie'  },
+  { type: 'kpi',   icon: LayoutGrid,     label: 'KPI'  },
+  { type: 'table', icon: TableIcon,      label: 'Table'},
 ];
 
-// ── Tooltip (shared) ────────────────────────────────────────────────────
+/* ── Shared tooltip ────────────────────────────────────────────────── */
 const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   if (!active || !payload?.length) return null;
   return (
-    <div 
-      className="rounded-lg border px-3 py-2.5 text-xs shadow-xl backdrop-blur-sm min-w-[140px] border-white/[0.08]"
-      style={{ background: 'rgba(28, 27, 29, 0.94)' }}
+    <div
+      className="rounded-lg px-3 py-2.5 text-[12px] min-w-[140px]"
+      style={{ background: TOOLTIP_BG, border: `1px solid ${TOOLTIP_BORDER}`, boxShadow: 'var(--ds-shadow-lg)' }}
     >
-      <p className="font-mono font-semibold text-slate-400 mb-1.5 border-b border-white/[0.06] pb-1">
+      <p className="font-mono font-semibold mb-1.5 pb-1 border-b border-[var(--ds-border-subtle)]"
+        style={{ color: AXIS_COLOR }}>
         {String(label ?? '')}
       </p>
       <div className="space-y-1">
-        {payload.map((entry, i: number) => (
-          <p key={i} className="flex items-center gap-3">
+        {payload.map((entry, i) => (
+          <p key={i} className="flex items-center gap-2.5">
             <span className="h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ background: entry.color }} />
-            <span className="text-slate-400 font-medium truncate max-w-[140px]">{entry.name ?? 'Value'}:</span>
-            <span className="font-mono font-bold text-slate-100 ml-auto">
+            <span className="truncate max-w-[100px]" style={{ color: AXIS_COLOR }}>
+              {entry.name ?? 'Value'}:
+            </span>
+            <span className="font-mono font-bold ml-auto" style={{ color: '#ededef' }}>
               {typeof entry.value === 'number' ? entry.value.toLocaleString() : String(entry.value ?? '')}
             </span>
           </p>
@@ -83,57 +88,43 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   );
 };
 
-// ── Main Component ──────────────────────────────────────────────────────
+/* ── Main component ────────────────────────────────────────────────── */
 export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
-  const defaultType = chartRecommendation?.chart_type || 'bar';
+  const defaultType: ChartType = data.length === 1 ? 'kpi' : (chartRecommendation?.chart_type || 'bar');
   const [chartType, setChartType] = useState<ChartType>(defaultType);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Controls state
-  const [sortKey, setSortKey] = useState<string>('none');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [limit, setLimit] = useState<string>('50');
+  const [sortKey, setSortKey]   = useState<string>('none');
+  const [sortDir, setSortDir]   = useState<'asc' | 'desc'>('desc');
+  const [limit, setLimit]       = useState<string>('50');
 
-  // Derive keys
   const { keys, xKey, numericKeys } = useMemo(() => {
     if (!data?.length) return { keys: [], xKey: '', numericKeys: [] };
     const k = Object.keys(data[0]);
-    const nk = k.filter(key =>
-      data.some(row => typeof row[key] === 'number' && !isNaN(row[key] as number))
-    );
+    const nk = k.filter((key) => data.some((r) => typeof r[key] === 'number' && !isNaN(r[key] as number)));
     return { keys: k, xKey: k[0], numericKeys: nk.length > 0 ? nk : k.slice(1) };
   }, [data]);
 
-  // Processed Data
   const processedData = useMemo(() => {
     if (!data?.length) return [];
     let result = [...data];
 
-    // Sort
     if (sortKey && sortKey !== 'none') {
       result.sort((a, b) => {
-        const valA = a[sortKey];
-        const valB = b[sortKey];
-        if (typeof valA === 'number' && typeof valB === 'number') {
-          return sortDir === 'asc' ? valA - valB : valB - valA;
-        }
-        const strA = String(valA ?? '');
-        const strB = String(valB ?? '');
-        return sortDir === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
+        const vA = a[sortKey]; const vB = b[sortKey];
+        if (typeof vA === 'number' && typeof vB === 'number')
+          return sortDir === 'asc' ? vA - vB : vB - vA;
+        const sA = String(vA ?? ''); const sB = String(vB ?? '');
+        return sortDir === 'asc' ? sA.localeCompare(sB) : sB.localeCompare(sA);
       });
     }
 
-    // Limit
-    const limitNum = parseInt(limit, 10);
-    if (!isNaN(limitNum) && limitNum > 0 && limitNum < result.length) {
-      result = result.slice(0, limitNum);
-    }
-
+    const n = parseInt(limit, 10);
+    if (!isNaN(n) && n > 0 && n < result.length) result = result.slice(0, n);
     return result;
   }, [data, sortKey, sortDir, limit]);
 
-  // Fullscreen toggle
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
@@ -145,26 +136,17 @@ export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
     }
   }, []);
 
-  // Export CSV
   const exportCSV = useCallback(() => {
     if (!processedData?.length) return;
     const headers = Object.keys(processedData[0]).join(',');
-    const rows = processedData.map(row => Object.values(row).map(v => `"${v}"`).join(',')).join('\n');
+    const rows = processedData.map((r) => Object.values(r).map((v) => `"${v}"`).join(',')).join('\n');
     const blob = new Blob([`${headers}\n${rows}`], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `intelliquery-data-${Date.now()}.csv`;
-    a.click();
+    a.href = url; a.download = `intelliquery-data-${Date.now()}.csv`; a.click();
     URL.revokeObjectURL(url);
   }, [processedData]);
 
-  const chartCanvasWidth = useMemo(() => {
-    if (chartType === 'pie' || chartType === 'kpi' || chartType === 'table') return '100%';
-    return Math.max(680, processedData.length * 64);
-  }, [chartType, processedData.length]);
-
-  // Export PNG
   const exportPNG = useCallback(() => {
     const svg = containerRef.current?.querySelector('.recharts-wrapper svg');
     if (!svg) return;
@@ -173,150 +155,146 @@ export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
     const ctx = canvas.getContext('2d');
     const img = new Image();
     img.onload = () => {
-      canvas.width = img.width * 2;
-      canvas.height = img.height * 2;
+      canvas.width = img.width * 2; canvas.height = img.height * 2;
       ctx!.scale(2, 2);
-      ctx!.fillStyle = '#0f172a';
+      ctx!.fillStyle = '#0f0f11';
       ctx!.fillRect(0, 0, canvas.width, canvas.height);
       ctx!.drawImage(img, 0, 0);
       const a = document.createElement('a');
       a.download = `intelliquery-chart-${Date.now()}.png`;
-      a.href = canvas.toDataURL('image/png');
-      a.click();
+      a.href = canvas.toDataURL('image/png'); a.click();
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
   }, []);
 
+  const chartCanvasWidth = useMemo(() => {
+    if (chartType === 'pie' || chartType === 'kpi' || chartType === 'table') return '100%';
+    return Math.max(680, processedData.length * 64);
+  }, [chartType, processedData.length]);
+
   if (!data?.length) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', bounce: 0.5 }}
-          className="p-4 rounded-full bg-primary/10 text-primary"
-        >
-          <BarChart3 className="h-8 w-8 opacity-80" />
-        </motion.div>
-        <p className="text-sm">Run a query to visualize results</p>
-      </div>
+      <EmptyState
+        icon={BarChart3}
+        title="No data to visualize"
+        description="Run a query to see charts here."
+        size="sm"
+        className="h-full"
+      />
     );
   }
 
   return (
-    <div ref={containerRef}
-      className={`flex flex-col h-full ${isFullscreen ? 'bg-background p-6 z-[100] fixed inset-0' : ''}`}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap text-sm">
-          {/* Chart type selector */}
-          <div className="mr-2 flex items-center gap-1 rounded-xl border border-white/[0.06] bg-[#101012] p-1">
+    <div
+      ref={containerRef}
+      className={`flex flex-col h-full ${isFullscreen ? 'fixed inset-0 z-[100] bg-base-0 p-6' : ''}`}
+    >
+      {/* ── Toolbar ───────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap flex-shrink-0">
+        <div className="flex items-center gap-2 flex-wrap">
+
+          {/* Chart type pills */}
+          <div className="flex items-center gap-0.5 rounded-md border border-border bg-base-2 p-0.5">
             {CHART_TYPE_OPTIONS.map(({ type, icon: Icon, label }) => (
-              <motion.button
+              <button
                 key={type}
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.95 }}
                 onClick={() => setChartType(type)}
                 title={label}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 ${chartType === type
-                  ? 'bg-white/[0.06] text-slate-100 border border-white/[0.08]'
-                  : 'text-slate-500 hover:bg-white/[0.04] hover:text-slate-200'
-                  }`}
+                className={[
+                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-[12px] font-medium',
+                  'transition-[background-color,color] duration-[100ms]',
+                  chartType === type
+                    ? 'bg-base-4 text-content-1 border border-border'
+                    : 'text-content-3 hover:bg-base-3 hover:text-content-2',
+                ].join(' ')}
               >
                 <Icon className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">{label}</span>
-              </motion.button>
+              </button>
             ))}
           </div>
 
-          {/* Sort Control */}
-          <div className="flex items-center gap-1.5 hidden sm:flex">
-            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          {/* Sort control */}
+          <div className="hidden sm:flex items-center gap-1.5">
+            <Filter className="h-3.5 w-3.5 text-content-3" />
             <Select value={sortKey} onValueChange={setSortKey}>
-              <SelectTrigger className="w-[120px] h-8 text-xs border-dashed">
-                <SelectValue placeholder="Sort by..." />
+              <SelectTrigger className="w-[120px] h-7 text-[12px]">
+                <SelectValue placeholder="Sort by…" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Default order</SelectItem>
-                {keys.map((k) => (
-                  <SelectItem key={k} value={k}>{k}</SelectItem>
-                ))}
+                {keys.map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}
               </SelectContent>
             </Select>
             {sortKey !== 'none' && (
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground"
-                onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-                title={`Sort ${sortDir}`}
+                size="icon-sm"
+                onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
+                title={`Currently ${sortDir}`}
               >
-                {sortDir === 'desc' ? <ArrowDownNarrowWide className="h-4 w-4" /> : <ArrowUpWideNarrow className="h-4 w-4" />}
+                {sortDir === 'desc'
+                  ? <ArrowDownNarrowWide className="h-3.5 w-3.5" />
+                  : <ArrowUpWideNarrow className="h-3.5 w-3.5" />}
               </Button>
             )}
           </div>
 
-          {/* Limit Control */}
+          {/* Limit control */}
           <div className="hidden sm:block">
             <Select value={limit} onValueChange={setLimit}>
-              <SelectTrigger className="w-[90px] h-8 text-xs border-dashed">
+              <SelectTrigger className="w-[88px] h-7 text-[12px]">
                 <SelectValue placeholder="Limit" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="10">Top 10</SelectItem>
                 <SelectItem value="50">Top 50</SelectItem>
                 <SelectItem value="100">Top 100</SelectItem>
-                <SelectItem value="0">All Rows</SelectItem>
+                <SelectItem value="0">All rows</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Right actions */}
         <div className="flex items-center gap-1 ml-auto">
           {chartRecommendation?.reason && (
-            <span className="text-[10px] text-[#c2c6d7] mr-2 hidden md:inline">
+            <span className="text-[10px] text-content-3 mr-2 hidden md:inline">
               {chartRecommendation.reason}
             </span>
           )}
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={exportCSV} title="Export CSV">
-              <Download className="h-3.5 w-3.5" />
-            </Button>
-          </motion.div>
+          <Button variant="ghost" size="icon-sm" onClick={exportCSV} title="Export CSV">
+            <Download className="h-3.5 w-3.5" />
+          </Button>
           {chartType !== 'table' && chartType !== 'kpi' && (
-            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={exportPNG} title="Export PNG">
-                <ImageDown className="h-3.5 w-3.5" />
-              </Button>
-            </motion.div>
-          )}
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleFullscreen} title="Toggle fullscreen">
-              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            <Button variant="ghost" size="icon-sm" onClick={exportPNG} title="Export PNG">
+              <ImageDown className="h-3.5 w-3.5" />
             </Button>
-          </motion.div>
+          )}
+          <Button variant="ghost" size="icon-sm" onClick={toggleFullscreen} title="Toggle fullscreen">
+            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          </Button>
         </div>
       </div>
 
-      {/* Chart area */}
+      {/* ── Chart area ────────────────────────────────────────── */}
       <div className="custom-scrollbar relative min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={chartType}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.16, ease: [0, 0, 0.2, 1] }}
             className="h-full"
             style={{ minWidth: chartCanvasWidth, width: chartCanvasWidth }}
           >
-            {chartType === 'bar' && <BarChartView data={processedData} xKey={xKey} numericKeys={numericKeys} />}
-            {chartType === 'line' && <LineChartView data={processedData} xKey={xKey} numericKeys={numericKeys} />}
-            {chartType === 'area' && <AreaChartView data={processedData} xKey={xKey} numericKeys={numericKeys} />}
-            {chartType === 'pie' && <PieChartView data={processedData} xKey={xKey} numericKeys={numericKeys} />}
-            {chartType === 'kpi' && <KPIView data={processedData} keys={keys} />}
-            {chartType === 'table' && <TableView data={processedData} keys={keys} />}
+            {chartType === 'bar'   && <BarChartView   data={processedData} xKey={xKey} numericKeys={numericKeys} />}
+            {chartType === 'line'  && <LineChartView  data={processedData} xKey={xKey} numericKeys={numericKeys} />}
+            {chartType === 'area'  && <AreaChartView  data={processedData} xKey={xKey} numericKeys={numericKeys} />}
+            {chartType === 'pie'   && <PieChartView   data={processedData} xKey={xKey} numericKeys={numericKeys} />}
+            {chartType === 'kpi'   && <KPIView        data={processedData} keys={keys} />}
+            {chartType === 'table' && <TableView      data={processedData} keys={keys} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -324,7 +302,7 @@ export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
   );
 };
 
-// ── Shared axis/grid props ──────────────────────────────────────────────
+/* ── Shared axis props ─────────────────────────────────────────────── */
 const axisProps = {
   stroke: AXIS_COLOR,
   fontSize: 11,
@@ -333,85 +311,97 @@ const axisProps = {
   tick: { fill: AXIS_COLOR },
 };
 
-const formatAxisLabel = (value: unknown) => {
-  const label = String(value ?? '');
-  return label.length > 14 ? `${label.slice(0, 12)}...` : label;
+const trim = (value: unknown) => {
+  const s = String(value ?? '');
+  return s.length > 14 ? `${s.slice(0, 12)}…` : s;
 };
 
-// ── Bar Chart ───────────────────────────────────────────────────────────
+/* ── Bar ───────────────────────────────────────────────────────────── */
 function BarChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 14, right: 18, bottom: 20, left: 8 }}>
+      <BarChart data={data} margin={{ top: 14, right: 16, bottom: 20, left: 8 }}>
         <CartesianGrid vertical={false} stroke={GRID_COLOR} />
-        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={formatAxisLabel} />
-        <YAxis {...axisProps} width={54} />
+        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={trim} />
+        <YAxis {...axisProps} width={52} />
         <Tooltip content={<CustomTooltip />} />
         {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: AXIS_COLOR }} />}
         {numericKeys.map((key, i) => (
-          <Bar key={key} dataKey={key} fill={CHART_COLORS[i % CHART_COLORS.length]}
-            fillOpacity={0.92} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeOpacity={0.75}
-            isAnimationActive={false} radius={[5, 5, 0, 0]} maxBarSize={48} />
+          <Bar key={key} dataKey={key}
+            fill={CHART_COLORS[i % CHART_COLORS.length]}
+            fillOpacity={0.9}
+            stroke={CHART_COLORS[i % CHART_COLORS.length]}
+            strokeOpacity={0.6}
+            isAnimationActive={false}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={48}
+          />
         ))}
       </BarChart>
     </ResponsiveContainer>
   );
 }
 
-// ── Line Chart ──────────────────────────────────────────────────────────
+/* ── Line ──────────────────────────────────────────────────────────── */
 function LineChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 14, right: 18, bottom: 20, left: 8 }}>
+      <LineChart data={data} margin={{ top: 14, right: 16, bottom: 20, left: 8 }}>
         <CartesianGrid vertical={false} stroke={GRID_COLOR} />
-        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={formatAxisLabel} />
-        <YAxis {...axisProps} width={54} />
+        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={trim} />
+        <YAxis {...axisProps} width={52} />
         <Tooltip content={<CustomTooltip />} />
         {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: AXIS_COLOR }} />}
         {numericKeys.map((key, i) => (
           <Line key={key} type="monotone" dataKey={key}
             stroke={CHART_COLORS[i % CHART_COLORS.length]}
-            strokeWidth={3} connectNulls isAnimationActive={false}
+            strokeWidth={2.5}
+            connectNulls
+            isAnimationActive={false}
             dot={{ r: 3, fill: CHART_COLORS[i % CHART_COLORS.length], strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: CHART_COLORS[i % CHART_COLORS.length] }} />
+            activeDot={{ r: 5, fill: CHART_COLORS[i % CHART_COLORS.length] }}
+          />
         ))}
       </LineChart>
     </ResponsiveContainer>
   );
 }
 
-// ── Area Chart ──────────────────────────────────────────────────────────
+/* ── Area ──────────────────────────────────────────────────────────── */
 function AreaChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data} margin={{ top: 14, right: 18, bottom: 20, left: 8 }}>
+      <AreaChart data={data} margin={{ top: 14, right: 16, bottom: 20, left: 8 }}>
         <defs>
           {numericKeys.map((key, i) => (
-            <linearGradient key={key} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.42} />
-              <stop offset="100%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.06} />
+            <linearGradient key={key} id={`area-grad-${i}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.40} />
+              <stop offset="100%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.04} />
             </linearGradient>
           ))}
         </defs>
         <CartesianGrid vertical={false} stroke={GRID_COLOR} />
-        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={formatAxisLabel} />
-        <YAxis {...axisProps} width={54} />
+        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={trim} />
+        <YAxis {...axisProps} width={52} />
         <Tooltip content={<CustomTooltip />} />
         {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: AXIS_COLOR }} />}
         {numericKeys.map((key, i) => (
           <Area key={key} type="monotone" dataKey={key}
             stroke={CHART_COLORS[i % CHART_COLORS.length]}
-            fill={`url(#grad-${i})`} strokeWidth={3} connectNulls isAnimationActive={false} />
+            fill={`url(#area-grad-${i})`}
+            strokeWidth={2.5}
+            connectNulls
+            isAnimationActive={false}
+          />
         ))}
       </AreaChart>
     </ResponsiveContainer>
   );
 }
 
-// ── Pie Chart ───────────────────────────────────────────────────────────
+/* ── Pie ───────────────────────────────────────────────────────────── */
 function PieChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
   const valueKey = numericKeys[0] || Object.keys(data[0])[1];
-
   return (
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
@@ -419,14 +409,13 @@ function PieChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: str
           data={data}
           dataKey={valueKey}
           nameKey={xKey}
-          cx="50%"
-          cy="50%"
-          outerRadius="75%"
-          innerRadius="40%"
+          cx="50%" cy="50%"
+          outerRadius="75%" innerRadius="42%"
           strokeWidth={2}
-          stroke="#0f172a"
+          stroke="#0f0f11"
           isAnimationActive={false}
-          label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} (${((percent ?? 0) * 100).toFixed(0)}%)`}
+          label={({ name, percent }: { name?: string; percent?: number }) =>
+            `${name ?? ''} (${((percent ?? 0) * 100).toFixed(0)}%)`}
           labelLine={{ stroke: AXIS_COLOR }}
         >
           {data.map((_, i) => (
@@ -440,43 +429,47 @@ function PieChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: str
   );
 }
 
-// ── KPI Cards ───────────────────────────────────────────────────────────
+/* ── KPI Cards ─────────────────────────────────────────────────────── */
 function KPIView({ data, keys }: { data: ChartRow[]; keys: string[]; }) {
-  // Use first row for KPI values
   const row = data[0];
-
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 h-full content-center">
       {keys.map((key, i) => {
         const val = row[key];
         const isNum = typeof val === 'number';
         return (
-          <Card
-  key={key}
-  className="flex flex-col justify-center rounded-2xl border border-white/[0.06] bg-[#101012] p-5 transition-all duration-200 hover:border-white/[0.1]"
->
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+          <div
+            key={key}
+            className="flex flex-col justify-center rounded-lg border border-border bg-base-2 p-5 hover:border-[var(--ds-border-moderate)] transition-[border-color] duration-[100ms]"
+          >
+            <p className="text-[11px] font-medium text-content-3 uppercase tracking-wider mb-2">
               {key.replace(/_/g, ' ')}
             </p>
-            <p className="text-2xl font-bold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+            <p className="text-[22px] font-bold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
               {isNum ? val.toLocaleString() : String(val ?? '—')}
             </p>
-          </Card>
+          </div>
         );
       })}
     </div>
   );
 }
 
-// ── Table View ──────────────────────────────────────────────────────────
+/* ── Table View ────────────────────────────────────────────────────── */
 function TableView({ data, keys }: { data: ChartRow[]; keys: string[]; }) {
   return (
-    <div className="h-full overflow-auto rounded-2xl border border-white/[0.06] bg-[#101012]">
-      <table className="results-table w-full">
-        <thead className="sticky top-0">
+    <div
+      className="h-full overflow-auto rounded-md border border-border bg-base-0 custom-scrollbar"
+      style={{ boxShadow: 'var(--ds-shadow-inset)' }}
+    >
+      <table className="w-full border-collapse">
+        <thead className="sticky top-0 z-10">
           <tr>
-            {keys.map(key => (
-              <th key={key} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-[#101012]">
+            {keys.map((key) => (
+              <th
+                key={key}
+                className="border-b border-border bg-base-2 px-3 py-2.5 text-left text-[11px] font-medium text-content-3 uppercase tracking-wide whitespace-nowrap"
+              >
                 {key}
               </th>
             ))}
@@ -484,9 +477,9 @@ function TableView({ data, keys }: { data: ChartRow[]; keys: string[]; }) {
         </thead>
         <tbody>
           {data.map((row, i) => (
-            <tr key={i} className="transition-colors duration-150 hover:bg-[#101012] border-t border-white/[0.06]">
-              {keys.map(key => (
-                <td key={key} className="px-4 py-3 text-sm text-foreground">
+            <tr key={i} className="border-b border-border/50 hover:bg-base-2 transition-colors duration-[100ms]">
+              {keys.map((key) => (
+                <td key={key} className="px-3 py-2.5 text-[12px] text-content-1 font-mono whitespace-nowrap">
                   {typeof row[key] === 'number' ? (row[key] as number).toLocaleString() : String(row[key] ?? '')}
                 </td>
               ))}

@@ -1,76 +1,96 @@
 'use client';
 
-import { History, Menu } from 'lucide-react';
+import { Menu, Settings, Database } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Sidebar } from './Sidebar';
-
-type HeaderSection = 'chart' | 'results' | 'insights' | 'explainer';
-type NavigationSection = HeaderSection | 'query' | 'schema' | 'snippets';
+import Link from 'next/link';
 
 type HeaderProps = {
   onHistory?: () => void;
   onReplay?: (question: string, sql: string) => void;
   onSectionSelect?: (section: any) => void;
-  activeSection?: HeaderSection;
+  activeSection?: 'chart' | 'results' | 'insights' | 'explainer';
+  activeView?: 'query' | 'schema' | 'snippets';
+  onViewChange?: (view: 'query' | 'schema' | 'snippets') => void;
   children?: React.ReactNode;
-}
+};
 
 export const Header = ({
-  onHistory,
   onReplay,
   onSectionSelect,
+  onViewChange,
+  activeView = 'query',
   children,
 }: HeaderProps) => {
 
   const handleMobileViewChange = (view: 'query' | 'schema' | 'snippets') => {
-    if (onSectionSelect) {
-      if (view === 'query') {
-        onSectionSelect('query');
-      } else {
-        onSectionSelect(view);
-      }
-    }
+    onViewChange?.(view);
+    onSectionSelect?.(view);
   };
 
   return (
-    <header className="sticky top-0 z-40 flex flex-shrink-0 items-center justify-center px-4 py-5 md:px-8 md:py-6">
-      <div className="absolute left-4 top-1/2 flex -translate-y-1/2 items-center gap-3 md:left-8">
+    <header className="flex flex-col flex-shrink-0 bg-base-1 border-b border-border">
+
+      {/* ── 48px top bar ─────────────────────────────────────── */}
+      <div className="flex items-center h-12 px-4 gap-2">
+
+        {/* Mobile: hamburger → Sheet → Sidebar */}
         <Sheet>
           <SheetTrigger asChild>
-            <button className="-ml-2 mr-1 flex h-9 w-9 items-center justify-center rounded-md text-[#c2c6d7] hover:bg-white/[0.04] hover:text-[#e5e1e4] lg:hidden">
-              <Menu className="h-5 w-5" />
+            <button
+              type="button"
+              aria-label="Open navigation"
+              className="h-7 w-7 flex items-center justify-center rounded-md text-content-3 hover:bg-base-3 hover:text-content-1 transition-colors duration-[100ms] lg:hidden flex-shrink-0"
+            >
+              <Menu className="h-4 w-4" />
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="flex w-[280px] border-white/10 bg-[#0e0e10] p-0">
-            <SheetTitle className="sr-only">Menu Dashboard Sidebar</SheetTitle>
-            <SheetDescription className="sr-only">Provides database connection navigation</SheetDescription>
-            
-            <Sidebar 
-              className="w-full h-full border-r-0" 
-              activeView="query" 
-              onViewChange={handleMobileViewChange} 
-              onReplay={onReplay} 
+          <SheetContent
+            side="left"
+            className="w-[232px] p-0 border-r border-border"
+            style={{ background: 'var(--ds-base-1)' }}
+          >
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            <SheetDescription className="sr-only">Application navigation sidebar</SheetDescription>
+            <Sidebar
+              className="w-full h-full border-r-0"
+              activeView={activeView}
+              onViewChange={handleMobileViewChange}
+              onReplay={onReplay}
               collapsed={false}
             />
           </SheetContent>
         </Sheet>
-      </div>
 
-      <div className="w-full max-w-3xl">{children}</div>
-
-      <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-2 md:right-8">
-        {onHistory && (
-          <div className="hidden items-center gap-2 text-[#c2c6d7] sm:flex">
-            <button
-              className="rounded-full p-2 transition-colors hover:bg-white/[0.04] hover:text-[#afc6ff]"
-              onClick={onHistory}
-              title="History"
-            >
-              <History className="h-5 w-5" />
-            </button>
+        {/* Logo — visible on mobile only; desktop shows this in the sidebar */}
+        <div className="flex items-center gap-2 lg:hidden">
+          <div className="h-6 w-6 flex items-center justify-center rounded-md bg-brand text-white flex-shrink-0">
+            <Database className="h-3.5 w-3.5" />
           </div>
-        )}
+          <span className="text-sm font-semibold text-content-1 tracking-tight">Intelliquery</span>
+        </div>
+
+        {/* Spacer pushes actions to the right */}
+        <div className="flex-1" />
+
+        {/* Right actions */}
+        <Link
+          href="/settings"
+          aria-label="Settings"
+          className="h-7 w-7 flex items-center justify-center rounded-md text-content-3 hover:bg-base-3 hover:text-content-1 transition-colors duration-[100ms]"
+        >
+          <Settings className="h-4 w-4" />
+        </Link>
       </div>
+
+      {/* ── Query input area ──────────────────────────────────────
+          Phase 4 moves this into the main content body.
+          Rendered here for backward compatibility with page.tsx. */}
+      {children && (
+        <div className="border-t border-border">
+          {children}
+        </div>
+      )}
     </header>
   );
 };

@@ -37,7 +37,6 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
 
         const update = () => {
             analyser.getByteFrequencyData(dataArray);
-            // Sample 5 frequency bands
             const step = Math.floor(dataArray.length / 5);
             const bars = Array.from({ length: 5 }, (_, i) => {
                 const val = dataArray[i * step] / 255;
@@ -59,7 +58,6 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
         };
     }, []);
 
-    // Web Speech API
     const startWebSpeech = useCallback(() => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
@@ -110,7 +108,6 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
             if (transcript.trim()) {
                 onTranscript(transcript.trim());
             }
-    
             if (!fellBackToWhisperRef.current) {
                 cleanup();
             }
@@ -120,13 +117,11 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
         recognitionRef.current = recognition;
     }, [onTranscript]);
 
-    // Whisper fallback
     const startWhisperRecording = useCallback(async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
 
-            // Set up audio analyser for waveform
             const audioCtx = new AudioContext();
             const source = audioCtx.createMediaStreamSource(stream);
             const analyser = audioCtx.createAnalyser();
@@ -190,7 +185,6 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
                 analyserRef.current = analyser;
                 animateWaveform();
             } catch { }
-
             startWebSpeech();
         } else {
             await startWhisperRecording();
@@ -235,6 +229,9 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
         analyserRef.current = null;
     }, []);
 
+    // suppress unused variable warning — mode is set for external consumers
+    void mode;
+
     const handleClick = () => {
         if (isRecording) {
             stopRecording();
@@ -246,7 +243,7 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
     return (
         <div className="flex items-center gap-2">
             {isRecording && (
-                <div className="voice-waveform flex items-center gap-[3px] h-6">
+                <div className="voice-waveform flex items-center gap-[3px] h-5">
                     {waveformBars.map((height, i) => (
                         <div
                             key={i}
@@ -261,14 +258,14 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
             )}
 
             {isProcessing && (
-                <span className="flex items-center gap-1 text-xs text-[#c2c6d7]">
+                <span className="flex items-center gap-1.5 text-[12px] text-content-2">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    Transcribing...
+                    Transcribing…
                 </span>
             )}
 
             {error && (
-                <span className="text-xs text-[#ffb4ab]">{error}</span>
+                <span className="text-[12px] text-error">{error}</span>
             )}
 
             <Button
@@ -277,17 +274,13 @@ export const VoiceInput = ({ onTranscript, disabled = false }: VoiceInputProps) 
                 size="icon"
                 onClick={handleClick}
                 disabled={disabled || isProcessing}
-                className={`relative h-10 w-10 rounded-2xl border border-white/10 transition-all duration-300 ${isRecording
-                    ? 'bg-red-500/10 text-[#ffb4ab] hover:bg-red-500/20 voice-recording-pulse'
-                    : 'bg-[#353437]/50 text-[#c2c6d7] hover:bg-[#afc6ff]/15 hover:text-[#afc6ff]'
-                    }`}
+                className={isRecording
+                    ? 'text-error bg-error-muted border border-error-border hover:bg-[rgba(248,113,113,0.18)] voice-recording-pulse'
+                    : 'text-content-3 hover:text-content-1'
+                }
                 title={isRecording ? 'Stop recording' : 'Voice input'}
             >
-                {isRecording ? (
-                    <MicOff className="h-4 w-4" />
-                ) : (
-                    <Mic className="h-4 w-4" />
-                )}
+                {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
             </Button>
         </div>
     );

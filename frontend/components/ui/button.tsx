@@ -5,28 +5,49 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  [
+    /* Base layout */
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium select-none shrink-0",
+    /* Icons */
+    "[&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
+    /* Transitions — color/bg fast, scale is instant (active:transition-none) */
+    "transition-[background-color,color,border-color,box-shadow] duration-[100ms]",
+    "active:scale-[0.97] active:transition-none",
+    /* Focus ring — blue, 3px spread */
+    "outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+    /* Disabled */
+    "disabled:pointer-events-none disabled:opacity-50",
+  ].join(" "),
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        /* Primary — Electric Blue fill */
+        default:
+          "bg-primary text-primary-foreground hover:bg-brand-hover",
+        /* Destructive — muted red surface */
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-error-muted text-error border border-error-border hover:bg-[rgba(248,113,113,0.18)]",
+        /* Outline — slightly elevated surface, visible border */
         outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+          "bg-base-2 text-content-1 border border-[var(--ds-border-moderate)] hover:bg-base-3 hover:border-[var(--ds-border-strong)]",
+        /* Secondary — muted surface */
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "bg-base-3 text-content-1 hover:bg-base-4",
+        /* Ghost — no background, low-contrast text */
         ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
+          "text-content-2 hover:bg-base-3 hover:text-content-1",
+        /* Link — inline, no scale */
+        link:
+          "text-brand underline-offset-4 hover:underline active:scale-100",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
+        /* 32px default per design spec */
+        default:   "h-8 px-3.5 text-[13px]",
+        sm:        "h-7 rounded-md gap-1.5 px-3 text-[12px]",
+        lg:        "h-9 rounded-md px-4 text-sm",
+        icon:      "size-8",
+        "icon-sm": "size-7",
+        "icon-lg": "size-9",
       },
     },
     defaultVariants: {

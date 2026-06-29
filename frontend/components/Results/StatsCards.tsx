@@ -1,6 +1,6 @@
 'use client';
 
-import { Users, TrendingUp, BarChart3, Binary } from 'lucide-react';
+import { Users, TrendingUp, BarChart3 } from 'lucide-react';
 import { useMemo } from 'react';
 
 interface StatsCardsProps {
@@ -8,54 +8,42 @@ interface StatsCardsProps {
 }
 
 export const StatsCards = ({ data }: StatsCardsProps) => {
-  const telemetryMetrics = useMemo(() => {
+  const metrics = useMemo(() => {
     const totalRecords = data?.length || 0;
+
     if (totalRecords === 0) {
       return [
-        { icon: Users, label: 'Rows Returned', value: '0', shift: 'Awaiting Run', color: 'text-primary' },
-        { icon: TrendingUp, label: 'Average Value', value: '0.00', shift: 'No Data', color: 'text-emerald-400' },
-        { icon: Binary, label: 'Highest Value', value: '—', shift: 'Static Shell', color: 'text-amber-400' },
+        { icon: Users,    label: 'Rows Returned', value: '0',    sub: 'Awaiting run',     color: 'text-brand' },
+        { icon: TrendingUp, label: 'Average Value', value: '0.00', sub: 'No data',          color: 'text-success' },
+        { icon: BarChart3,  label: 'Highest Value', value: '—',    sub: 'Static shell',     color: 'text-warning' },
       ];
     }
 
     const itemKeys = Object.keys(data[0]);
-    const functionalNumericKeys = itemKeys.filter(key => 
-      data.some(row => typeof row[key] === 'number' && !isNaN(row[key] as number))
+    const numericKeys = itemKeys.filter((k) =>
+      data.some((r) => typeof r[k] === 'number' && !isNaN(r[k] as number))
     );
 
-    let activeTargetLabel = "Row Baseline";
-    let formattedAverage = "0.00";
-    let formattedPeak = "—";
-    let growthIndicator = "Symmetrical Profile";
+    let activeLabel = 'Row Baseline';
+    let formattedAvg = '0.00';
+    let formattedPeak = '—';
+    let growthNote = 'Symmetrical profile';
 
-    if (functionalNumericKeys.length > 0) {
-      // Isolate the primary numeric aggregation layer column
-      const trackingKey = functionalNumericKeys[functionalNumericKeys.length - 1];
-      activeTargetLabel = trackingKey.replace(/_/g, ' ').toUpperCase();
-      
-      const numericalArray = data.map(row => Number(row[trackingKey]) || 0);
-      const totalSum = numericalArray.reduce((acc, curr) => acc + curr, 0);
-      const computedMean = totalSum / numericalArray.length;
-      const calculatedMax = Math.max(...numericalArray);
-
-      formattedAverage = computedMean.toLocaleString(undefined, {
-        maximumFractionDigits: 2,
-        minimumFractionDigits: 2
-      });
-      formattedPeak = calculatedMax.toLocaleString();
-
-      if (calculatedMax > computedMean * 1.5) {
-        growthIndicator = "Above normal range";
-      } else {
-        growthIndicator = "Within expected range";
-      }
+    if (numericKeys.length > 0) {
+      const key = numericKeys[numericKeys.length - 1];
+      activeLabel = key.replace(/_/g, ' ').toUpperCase();
+      const nums = data.map((r) => Number(r[key]) || 0);
+      const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+      const peak = Math.max(...nums);
+      formattedAvg = mean.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+      formattedPeak = peak.toLocaleString();
+      growthNote = peak > mean * 1.5 ? 'Above normal range' : 'Within expected range';
     } else {
-      const stringColumns = itemKeys.filter(k => typeof data[0][k] === 'string');
-      if (stringColumns.length > 0) {
-        activeTargetLabel = `UNIQUE ${stringColumns[0].toUpperCase()}`;
-        const totalUniqueSets = new Set(data.map(r => String(r[stringColumns[0]] || ''))).size;
-        formattedAverage = `${totalUniqueSets} sets`;
-        growthIndicator = "Categorical Mapping";
+      const strCols = itemKeys.filter((k) => typeof data[0][k] === 'string');
+      if (strCols.length > 0) {
+        activeLabel = `UNIQUE ${strCols[0].toUpperCase()}`;
+        formattedAvg = `${new Set(data.map((r) => String(r[strCols[0]] || ''))).size} sets`;
+        growthNote = 'Categorical mapping';
       }
     }
 
@@ -64,56 +52,49 @@ export const StatsCards = ({ data }: StatsCardsProps) => {
         icon: Users,
         label: 'Rows Returned',
         value: totalRecords.toLocaleString(),
-        shift: `${itemKeys.length} active fields`,
-        color: 'text-primary'
+        sub: `${itemKeys.length} active fields`,
+        color: 'text-brand',
       },
       {
         icon: TrendingUp,
-        label: `Mean: ${activeTargetLabel}`,
-        value: formattedAverage,
-        shift: growthIndicator,
-        color: 'text-emerald-400'
+        label: `Mean: ${activeLabel}`,
+        value: formattedAvg,
+        sub: growthNote,
+        color: 'text-success',
       },
       {
         icon: BarChart3,
         label: 'Peak Value',
         value: formattedPeak,
-        shift: 'Upper bound boundary',
-        color: 'text-amber-400'
-      }
+        sub: 'Upper bound',
+        color: 'text-warning',
+      },
     ];
   }, [data]);
 
- return (
-  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-    {telemetryMetrics.map((stat, idx) => (
-      <div
-        key={idx}
-        className="group rounded-2xl border border-white/[0.06] bg-[#101012] p-4 transition-all duration-200 hover:border-white/[0.1] hover:bg-[#141416]"
-      >
-        <div className="mb-3 flex items-start justify-between">
-          <div>
-            <span className="text-[11px] font-medium tracking-wide text-slate-500">
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {metrics.map((stat, idx) => (
+        <div
+          key={idx}
+          className="group rounded-lg border border-border bg-base-2 p-4 hover:border-[var(--ds-border-moderate)] transition-[border-color] duration-[100ms]"
+        >
+          <div className="mb-3 flex items-start justify-between">
+            <span className="text-[11px] font-medium tracking-wide text-content-3 uppercase">
               {stat.label}
             </span>
+            <div className="rounded-md bg-base-3 p-1.5 transition-colors duration-[100ms] group-hover:bg-base-4">
+              <stat.icon className={`h-4 w-4 ${stat.color}`} />
+            </div>
           </div>
-
-          <div className="rounded-lg bg-white/[0.03] p-2 transition-colors duration-200 group-hover:bg-white/[0.05]">
-            <stat.icon className={`h-4 w-4 ${stat.color}`} />
+          <div className="space-y-0.5">
+            <p className="text-[22px] font-semibold tracking-tight text-content-1">
+              {stat.value}
+            </p>
+            <p className="text-[12px] text-content-3">{stat.sub}</p>
           </div>
         </div>
-
-        <div className="space-y-1">
-          <p className="text-2xl font-semibold tracking-tight text-slate-100">
-            {stat.value}
-          </p>
-
-          <p className="text-xs text-slate-500">
-            {stat.shift}
-          </p>
-        </div>
-      </div>
-    ))}
-  </div>
-);
+      ))}
+    </div>
+  );
 };
