@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/Providers/ThemeProvider";
 import { ToastProvider } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,13 +27,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans bg-[#09090b] text-[#e5e1e4] antialiased`}
-      >
-        <ThemeProvider defaultTheme="system" storageKey="intelliquery-theme">
-          <ToastProvider>
-            {children}
-          </ToastProvider>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ThemeProvider defaultTheme="light" storageKey="intelliquery-theme">
+          <TooltipProvider delayDuration={400}>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,492 +1,482 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+'use client';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  BarChart, Bar, LineChart, Line, AreaChart, Area,
-  PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from 'recharts';
-import { Button } from '@/components/ui/button';
-import {
-  BarChart3, LineChartIcon, PieChartIcon, TrendingUp, LayoutGrid,
-  Maximize2, Minimize2, Download, ImageDown, Table as TableIcon,
-  ArrowDownNarrowWide, ArrowUpWideNarrow, Filter,
-} from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+  Filler,
+  type TooltipItem,
+} from 'chart.js';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { useTheme } from '@/components/Providers/ThemeProvider';
 import { EmptyState } from '@/components/ui/empty-state';
-import { motion, AnimatePresence } from 'motion/react';
+import {
+  BarChart3,
+  LineChart as LineChartIcon,
+  TrendingUp,
+  PieChart,
+  LayoutGrid,
+  Table as TableIcon,
+} from 'lucide-react';
 
-/* ── Design-aligned chart palette ──────────────────────────────────────
-   Order matches: brand → success → warning → error → info → extended  */
-const CHART_COLORS = [
-  '#3b82f6',  // Blue (accent-hover)
-  '#22c55e',  // Green (success)
-  '#f59e0b',  // Amber (warning)
-  '#f87171',  // Red (error)
-  '#60a5fa',  // Light blue (info)
-  '#e879f9',  // Fuchsia (chart-6)
-  '#34d399',  // Emerald
-  '#fbbf24',  // Yellow
-  '#f97316',  // Orange
-  '#22d3ee',  // Cyan
-  '#a78bfa',  // Violet
-  '#fb7185',  // Rose
-];
+/* ── Register Chart.js ──────────────────────────────────────── */
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+  Filler,
+);
 
-/* Recharts expects hex, not CSS vars */
-const GRID_COLOR   = 'rgba(255,255,255,0.05)';
-const AXIS_COLOR   = '#5e5e6a';  /* --ds-text-3 */
-const TOOLTIP_BG   = 'rgba(20,20,23,0.96)';  /* ~--ds-base-2 */
-const TOOLTIP_BORDER = 'rgba(255,255,255,0.10)';  /* --ds-border-moderate */
-
-/* ── Types ─────────────────────────────────────────────────────────── */
-type ChartType = 'bar' | 'line' | 'pie' | 'kpi' | 'area' | 'table';
-type ChartRow  = Record<string, unknown>;
-
-interface TooltipEntry { color?: string; name?: string; value?: unknown; }
-interface TooltipProps  { active?: boolean; payload?: TooltipEntry[]; label?: unknown; }
+/* ── Types ──────────────────────────────────────────────────── */
+type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'table';
+type Row = Record<string, unknown>;
 
 interface ChartPanelProps {
-  data: Record<string, unknown>[];
-  chartRecommendation?: { chart_type: ChartType; reason?: string; };
+  data: Row[];
+  chartRecommendation?: { chart_type: string; reason?: string };
+  xKey?: string;
+  yKeys?: string[];
 }
 
-/* ── Chart type button list ────────────────────────────────────────── */
-const CHART_TYPE_OPTIONS: { type: ChartType; icon: React.ElementType; label: string; }[] = [
-  { type: 'bar',   icon: BarChart3,      label: 'Bar'  },
-  { type: 'line',  icon: LineChartIcon,  label: 'Line' },
-  { type: 'area',  icon: TrendingUp,     label: 'Area' },
-  { type: 'pie',   icon: PieChartIcon,   label: 'Pie'  },
-  { type: 'kpi',   icon: LayoutGrid,     label: 'KPI'  },
-  { type: 'table', icon: TableIcon,      label: 'Table'},
+/* ── Colour palettes ────────────────────────────────────────── */
+const LIGHT_COLORS = [
+  '#2563eb', '#16a34a', '#d97706', '#dc2626',
+  '#7c3aed', '#0d9488', '#db2777', '#ea580c',
+  '#0891b2', '#9333ea', '#b45309', '#0f766e',
+];
+const DARK_COLORS = [
+  '#3b82f6', '#22c55e', '#f59e0b', '#f87171',
+  '#a78bfa', '#34d399', '#f472b6', '#fb923c',
+  '#22d3ee', '#c084fc', '#fbbf24', '#2dd4bf',
 ];
 
-/* ── Shared tooltip ────────────────────────────────────────────────── */
-const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
-  if (!active || !payload?.length) return null;
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/* ── Chart type selector config ─────────────────────────────── */
+const CHART_TYPES: { type: ChartType; Icon: React.ElementType; label: string }[] = [
+  { type: 'bar',   Icon: BarChart3,     label: 'Bar'   },
+  { type: 'line',  Icon: LineChartIcon, label: 'Line'  },
+  { type: 'area',  Icon: TrendingUp,    label: 'Area'  },
+  { type: 'pie',   Icon: PieChart,      label: 'Donut' },
+  { type: 'kpi',   Icon: LayoutGrid,    label: 'KPI'   },
+  { type: 'table', Icon: TableIcon,     label: 'Table' },
+];
+
+/* ── Derive chart data ──────────────────────────────────────── */
+function deriveChartData(data: Row[], xKey?: string, yKeys?: string[]) {
+  if (!data?.length) return { labels: [], numericCols: [], labelCol: '' };
+  const cols = Object.keys(data[0]);
+  const autoNumericCols = cols.filter((c) =>
+    data.some((r) => typeof r[c] === 'number' && !isNaN(Number(r[c])))
+  );
+  const numericCols = yKeys
+    ? yKeys.filter(k => cols.includes(k))
+    : autoNumericCols;
+  const labelCol = xKey ||
+    cols.find((c) => typeof data[0][c] === 'string' && !autoNumericCols.includes(c)) ||
+    cols[0];
+  const labels = data.map((r) => String(r[labelCol] ?? ''));
+  return { labels, numericCols, labelCol };
+}
+
+/* ── Type pill selector ─────────────────────────────────────── */
+function TypeSelector({
+  active,
+  onChange,
+}: {
+  active: ChartType;
+  onChange: (t: ChartType) => void;
+}) {
   return (
-    <div
-      className="rounded-lg px-3 py-2.5 text-[12px] min-w-[140px]"
-      style={{ background: TOOLTIP_BG, border: `1px solid ${TOOLTIP_BORDER}`, boxShadow: 'var(--ds-shadow-lg)' }}
-    >
-      <p className="font-mono font-semibold mb-1.5 pb-1 border-b border-[var(--ds-border-subtle)]"
-        style={{ color: AXIS_COLOR }}>
-        {String(label ?? '')}
-      </p>
-      <div className="space-y-1">
-        {payload.map((entry, i) => (
-          <p key={i} className="flex items-center gap-2.5">
-            <span className="h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ background: entry.color }} />
-            <span className="truncate max-w-[100px]" style={{ color: AXIS_COLOR }}>
-              {entry.name ?? 'Value'}:
-            </span>
-            <span className="font-mono font-bold ml-auto" style={{ color: '#ededef' }}>
-              {typeof entry.value === 'number' ? entry.value.toLocaleString() : String(entry.value ?? '')}
-            </span>
-          </p>
-        ))}
-      </div>
+    <div className="flex items-center gap-1 flex-wrap">
+      {CHART_TYPES.map(({ type, Icon, label }) => (
+        <button
+          key={type}
+          type="button"
+          onClick={() => onChange(type)}
+          className={[
+            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium',
+            'transition-colors duration-[100ms] select-none',
+            active === type
+              ? 'bg-brand text-white shadow-sm'
+              : 'bg-base-2 text-content-2 hover:bg-base-3 hover:text-content-1 border border-border',
+          ].join(' ')}
+        >
+          <Icon className="h-3.5 w-3.5" />
+          {label}
+        </button>
+      ))}
     </div>
   );
-};
+}
 
-/* ── Main component ────────────────────────────────────────────────── */
-export const ChartPanel = ({ data, chartRecommendation }: ChartPanelProps) => {
-  const defaultType: ChartType = data.length === 1 ? 'kpi' : (chartRecommendation?.chart_type || 'bar');
-  const [chartType, setChartType] = useState<ChartType>(defaultType);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+/* ── Main chart panel ───────────────────────────────────────── */
+export function ChartPanel({ data, chartRecommendation, xKey, yKeys }: ChartPanelProps) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
-  const [sortKey, setSortKey]   = useState<string>('none');
-  const [sortDir, setSortDir]   = useState<'asc' | 'desc'>('desc');
-  const [limit, setLimit]       = useState<string>('50');
+  /* Derive default chart type */
+  const defaultType: ChartType = useMemo(() => {
+    if (!data?.length) return 'bar';
+    if (data.length === 1) return 'kpi';
+    const rec = chartRecommendation?.chart_type as ChartType | undefined;
+    return rec || 'bar';
+  }, [data, chartRecommendation]);
 
-  const { keys, xKey, numericKeys } = useMemo(() => {
-    if (!data?.length) return { keys: [], xKey: '', numericKeys: [] };
-    const k = Object.keys(data[0]);
-    const nk = k.filter((key) => data.some((r) => typeof r[key] === 'number' && !isNaN(r[key] as number)));
-    return { keys: k, xKey: k[0], numericKeys: nk.length > 0 ? nk : k.slice(1) };
-  }, [data]);
+  const [activeType, setActiveType] = useState<ChartType>(defaultType);
 
-  const processedData = useMemo(() => {
-    if (!data?.length) return [];
-    let result = [...data];
+  /* Sync type when recommendation or data changes */
+  useEffect(() => {
+    setActiveType(defaultType);
+  }, [defaultType]);
 
-    if (sortKey && sortKey !== 'none') {
-      result.sort((a, b) => {
-        const vA = a[sortKey]; const vB = b[sortKey];
-        if (typeof vA === 'number' && typeof vB === 'number')
-          return sortDir === 'asc' ? vA - vB : vB - vA;
-        const sA = String(vA ?? ''); const sB = String(vB ?? '');
-        return sortDir === 'asc' ? sA.localeCompare(sB) : sB.localeCompare(sA);
-      });
-    }
+  /* Theme-dependent palette */
+  const colors     = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const gridColor  = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const axisColor  = isDark ? '#5e5e6a' : '#94a3b8';
+  const ttBg       = isDark ? 'rgba(20,20,23,0.96)' : 'rgba(255,255,255,0.98)';
+  const ttBorder   = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)';
+  const ttTitle    = isDark ? '#ededef' : '#0f172a';
+  const ttBody     = isDark ? '#9494a0' : '#64748b';
 
-    const n = parseInt(limit, 10);
-    if (!isNaN(n) && n > 0 && n < result.length) result = result.slice(0, n);
-    return result;
-  }, [data, sortKey, sortDir, limit]);
+  const { labels, numericCols } = useMemo(() => deriveChartData(data, xKey, yKeys), [data, xKey, yKeys]);
 
-  const toggleFullscreen = useCallback(() => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  }, []);
+  /* Shared tooltip config */
+  const tooltipPlugin = useMemo(() => ({
+    backgroundColor: ttBg,
+    borderColor: ttBorder,
+    borderWidth: 1,
+    titleColor: ttTitle,
+    bodyColor: ttBody,
+    padding: { x: 12, y: 10 },
+    cornerRadius: 8,
+    displayColors: true,
+    boxWidth: 8,
+    boxHeight: 8,
+    callbacks: {
+      label: (ctx: TooltipItem<'bar' | 'line'>) =>
+        ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString()}`,
+    },
+  }), [ttBg, ttBorder, ttTitle, ttBody]);
 
-  const exportCSV = useCallback(() => {
-    if (!processedData?.length) return;
-    const headers = Object.keys(processedData[0]).join(',');
-    const rows = processedData.map((r) => Object.values(r).map((v) => `"${v}"`).join(',')).join('\n');
-    const blob = new Blob([`${headers}\n${rows}`], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `intelliquery-data-${Date.now()}.csv`; a.click();
-    URL.revokeObjectURL(url);
-  }, [processedData]);
+  /* Shared axis config */
+  const scales = useMemo(() => ({
+    x: {
+      grid:   { color: gridColor, lineWidth: 1 },
+      ticks:  {
+        color: axisColor,
+        font: { size: 11 as const },
+        maxTicksLimit: 10,
+        maxRotation: 45,
+        minRotation: 0,
+        callback(val: unknown) {
+          const label = labels[val as number] ?? String(val);
+          return typeof label === 'string' && label.length > 16
+            ? label.slice(0, 16) + '…'
+            : label;
+        },
+      },
+      border: { display: false as const },
+    },
+    y: {
+      grid:   { color: gridColor, lineWidth: 1 },
+      ticks:  { color: axisColor, font: { size: 11 as const } },
+      border: { display: false as const },
+    },
+  }), [gridColor, axisColor, labels]);
 
-  const exportPNG = useCallback(() => {
-    const svg = containerRef.current?.querySelector('.recharts-wrapper svg');
-    if (!svg) return;
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    img.onload = () => {
-      canvas.width = img.width * 2; canvas.height = img.height * 2;
-      ctx!.scale(2, 2);
-      ctx!.fillStyle = '#0f0f11';
-      ctx!.fillRect(0, 0, canvas.width, canvas.height);
-      ctx!.drawImage(img, 0, 0);
-      const a = document.createElement('a');
-      a.download = `intelliquery-chart-${Date.now()}.png`;
-      a.href = canvas.toDataURL('image/png'); a.click();
-    };
-    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
-  }, []);
+  /* Legend config */
+  const legendPlugin = useMemo(() => ({
+    display: numericCols.length > 1,
+    labels: {
+      color: axisColor,
+      font: { size: 11 as const },
+      boxWidth: 8,
+      boxHeight: 8,
+      padding: 16,
+      usePointStyle: true,
+    },
+  }), [axisColor, numericCols.length]);
 
-  const chartCanvasWidth = useMemo(() => {
-    if (chartType === 'pie' || chartType === 'kpi' || chartType === 'table') return '100%';
-    return Math.max(680, processedData.length * 64);
-  }, [chartType, processedData.length]);
-
+  /* ── Empty state ── */
   if (!data?.length) {
     return (
       <EmptyState
         icon={BarChart3}
         title="No data to visualize"
-        description="Run a query to see charts here."
-        size="sm"
-        className="h-full"
+        description="Run a query to see a chart here."
+        size="md"
       />
     );
   }
 
-  return (
-    <div
-      ref={containerRef}
-      className={`flex flex-col h-full ${isFullscreen ? 'fixed inset-0 z-[100] bg-base-0 p-6' : ''}`}
-    >
-      {/* ── Toolbar ───────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap flex-shrink-0">
-        <div className="flex items-center gap-2 flex-wrap">
-
-          {/* Chart type pills */}
-          <div className="flex items-center gap-0.5 rounded-md border border-border bg-base-2 p-0.5">
-            {CHART_TYPE_OPTIONS.map(({ type, icon: Icon, label }) => (
-              <button
-                key={type}
-                onClick={() => setChartType(type)}
-                title={label}
-                className={[
-                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-[12px] font-medium',
-                  'transition-[background-color,color] duration-[100ms]',
-                  chartType === type
-                    ? 'bg-base-4 text-content-1 border border-border'
-                    : 'text-content-3 hover:bg-base-3 hover:text-content-2',
-                ].join(' ')}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Sort control */}
-          <div className="hidden sm:flex items-center gap-1.5">
-            <Filter className="h-3.5 w-3.5 text-content-3" />
-            <Select value={sortKey} onValueChange={setSortKey}>
-              <SelectTrigger className="w-[120px] h-7 text-[12px]">
-                <SelectValue placeholder="Sort by…" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Default order</SelectItem>
-                {keys.map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {sortKey !== 'none' && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
-                title={`Currently ${sortDir}`}
-              >
-                {sortDir === 'desc'
-                  ? <ArrowDownNarrowWide className="h-3.5 w-3.5" />
-                  : <ArrowUpWideNarrow className="h-3.5 w-3.5" />}
-              </Button>
-            )}
-          </div>
-
-          {/* Limit control */}
-          <div className="hidden sm:block">
-            <Select value={limit} onValueChange={setLimit}>
-              <SelectTrigger className="w-[88px] h-7 text-[12px]">
-                <SelectValue placeholder="Limit" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">Top 10</SelectItem>
-                <SelectItem value="50">Top 50</SelectItem>
-                <SelectItem value="100">Top 100</SelectItem>
-                <SelectItem value="0">All rows</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Right actions */}
-        <div className="flex items-center gap-1 ml-auto">
-          {chartRecommendation?.reason && (
-            <span className="text-[10px] text-content-3 mr-2 hidden md:inline">
-              {chartRecommendation.reason}
-            </span>
-          )}
-          <Button variant="ghost" size="icon-sm" onClick={exportCSV} title="Export CSV">
-            <Download className="h-3.5 w-3.5" />
-          </Button>
-          {chartType !== 'table' && chartType !== 'kpi' && (
-            <Button variant="ghost" size="icon-sm" onClick={exportPNG} title="Export PNG">
-              <ImageDown className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          <Button variant="ghost" size="icon-sm" onClick={toggleFullscreen} title="Toggle fullscreen">
-            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-          </Button>
+  /* ── Bar chart ── */
+  if (activeType === 'bar') {
+    const chartData = {
+      labels,
+      datasets: numericCols.slice(0, 8).map((col, i) => ({
+        label: col.replace(/_/g, ' '),
+        data: data.map((r) => Number(r[col]) || 0),
+        backgroundColor: hexToRgba(colors[i % colors.length], 0.88),
+        borderColor: colors[i % colors.length],
+        borderWidth: 0,
+        borderRadius: 4,
+        borderSkipped: false as const,
+        hoverBackgroundColor: colors[i % colors.length],
+      })),
+    };
+    return (
+      <div className="flex flex-col h-full gap-3">
+        <TypeSelector active={activeType} onChange={setActiveType} />
+        <div className="flex-1 min-h-0">
+          <Bar
+            data={chartData}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 450 },
+              plugins: { legend: legendPlugin, tooltip: tooltipPlugin },
+              scales,
+            }}
+          />
         </div>
       </div>
+    );
+  }
 
-      {/* ── Chart area ────────────────────────────────────────── */}
-      <div className="custom-scrollbar relative min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={chartType}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.16, ease: [0, 0, 0.2, 1] }}
-            className="h-full"
-            style={{ minWidth: chartCanvasWidth, width: chartCanvasWidth }}
-          >
-            {chartType === 'bar'   && <BarChartView   data={processedData} xKey={xKey} numericKeys={numericKeys} />}
-            {chartType === 'line'  && <LineChartView  data={processedData} xKey={xKey} numericKeys={numericKeys} />}
-            {chartType === 'area'  && <AreaChartView  data={processedData} xKey={xKey} numericKeys={numericKeys} />}
-            {chartType === 'pie'   && <PieChartView   data={processedData} xKey={xKey} numericKeys={numericKeys} />}
-            {chartType === 'kpi'   && <KPIView        data={processedData} keys={keys} />}
-            {chartType === 'table' && <TableView      data={processedData} keys={keys} />}
-          </motion.div>
-        </AnimatePresence>
+  /* ── Line chart ── */
+  if (activeType === 'line') {
+    const chartData = {
+      labels,
+      datasets: numericCols.slice(0, 6).map((col, i) => ({
+        label: col.replace(/_/g, ' '),
+        data: data.map((r) => Number(r[col]) || 0),
+        borderColor: colors[i % colors.length],
+        backgroundColor: 'transparent',
+        borderWidth: 2.5,
+        pointRadius: data.length > 30 ? 0 : 3.5,
+        pointHoverRadius: 5,
+        pointBackgroundColor: colors[i % colors.length],
+        pointBorderColor: isDark ? '#141417' : '#ffffff',
+        pointBorderWidth: 2,
+        tension: 0.4,
+      })),
+    };
+    return (
+      <div className="flex flex-col h-full gap-3">
+        <TypeSelector active={activeType} onChange={setActiveType} />
+        <div className="flex-1 min-h-0">
+          <Line
+            data={chartData}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 450 },
+              plugins: { legend: legendPlugin, tooltip: tooltipPlugin },
+              scales,
+            }}
+          />
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
 
-/* ── Shared axis props ─────────────────────────────────────────────── */
-const axisProps = {
-  stroke: AXIS_COLOR,
-  fontSize: 11,
-  tickLine: false,
-  axisLine: false,
-  tick: { fill: AXIS_COLOR },
-};
-
-const trim = (value: unknown) => {
-  const s = String(value ?? '');
-  return s.length > 14 ? `${s.slice(0, 12)}…` : s;
-};
-
-/* ── Bar ───────────────────────────────────────────────────────────── */
-function BarChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 14, right: 16, bottom: 20, left: 8 }}>
-        <CartesianGrid vertical={false} stroke={GRID_COLOR} />
-        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={trim} />
-        <YAxis {...axisProps} width={52} />
-        <Tooltip content={<CustomTooltip />} />
-        {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: AXIS_COLOR }} />}
-        {numericKeys.map((key, i) => (
-          <Bar key={key} dataKey={key}
-            fill={CHART_COLORS[i % CHART_COLORS.length]}
-            fillOpacity={0.9}
-            stroke={CHART_COLORS[i % CHART_COLORS.length]}
-            strokeOpacity={0.6}
-            isAnimationActive={false}
-            radius={[4, 4, 0, 0]}
-            maxBarSize={48}
+  /* ── Area chart ── */
+  if (activeType === 'area') {
+    const chartData = {
+      labels,
+      datasets: numericCols.slice(0, 4).map((col, i) => ({
+        label: col.replace(/_/g, ' '),
+        data: data.map((r) => Number(r[col]) || 0),
+        borderColor: colors[i % colors.length],
+        backgroundColor: hexToRgba(colors[i % colors.length], isDark ? 0.18 : 0.12),
+        borderWidth: 2.5,
+        pointRadius: data.length > 30 ? 0 : 3,
+        pointHoverRadius: 4,
+        pointBackgroundColor: colors[i % colors.length],
+        tension: 0.4,
+        fill: true,
+      })),
+    };
+    return (
+      <div className="flex flex-col h-full gap-3">
+        <TypeSelector active={activeType} onChange={setActiveType} />
+        <div className="flex-1 min-h-0">
+          <Line
+            data={chartData}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 450 },
+              plugins: { legend: legendPlugin, tooltip: tooltipPlugin },
+              scales,
+            }}
           />
-        ))}
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
+        </div>
+      </div>
+    );
+  }
 
-/* ── Line ──────────────────────────────────────────────────────────── */
-function LineChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 14, right: 16, bottom: 20, left: 8 }}>
-        <CartesianGrid vertical={false} stroke={GRID_COLOR} />
-        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={trim} />
-        <YAxis {...axisProps} width={52} />
-        <Tooltip content={<CustomTooltip />} />
-        {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: AXIS_COLOR }} />}
-        {numericKeys.map((key, i) => (
-          <Line key={key} type="monotone" dataKey={key}
-            stroke={CHART_COLORS[i % CHART_COLORS.length]}
-            strokeWidth={2.5}
-            connectNulls
-            isAnimationActive={false}
-            dot={{ r: 3, fill: CHART_COLORS[i % CHART_COLORS.length], strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: CHART_COLORS[i % CHART_COLORS.length] }}
-          />
-        ))}
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
+  /* ── Doughnut / Pie ── */
+  if (activeType === 'pie') {
+    const col = numericCols[0] || Object.keys(data[0])[0];
+    const slice = data.slice(0, 10);
+    const vals = slice.map((r) => Number(r[col]) || 0);
+    const sliceColors = colors.slice(0, vals.length);
+    const chartData = {
+      labels: slice.map((r) => String(r[Object.keys(data[0]).find(k => typeof data[0][k] === 'string') || Object.keys(data[0])[0]] ?? '')),
+      datasets: [{
+        data: vals,
+        backgroundColor: sliceColors.map((c) => hexToRgba(c, 0.88)),
+        borderColor: isDark ? '#141417' : '#ffffff',
+        borderWidth: 2,
+        hoverOffset: 8,
+        hoverBorderWidth: 0,
+      }],
+    };
+    return (
+      <div className="flex flex-col h-full gap-3">
+        <TypeSelector active={activeType} onChange={setActiveType} />
+        <div className="flex-1 min-h-0 flex items-center justify-center">
+          <div className="w-full h-full" style={{ maxWidth: 420 }}>
+            <Doughnut
+              data={chartData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 450 },
+                cutout: '62%',
+                plugins: {
+                  legend: {
+                    position: 'right' as const,
+                    labels: {
+                      color: axisColor,
+                      font: { size: 11 as const },
+                      boxWidth: 10,
+                      boxHeight: 10,
+                      padding: 12,
+                      usePointStyle: true,
+                    },
+                  },
+                  tooltip: {
+                    backgroundColor: ttBg,
+                    borderColor: ttBorder,
+                    borderWidth: 1,
+                    titleColor: ttTitle,
+                    bodyColor: ttBody,
+                    padding: { x: 12, y: 10 },
+                    cornerRadius: 8,
+                    callbacks: {
+                      label: (ctx: TooltipItem<'doughnut'>) =>
+                        ` ${ctx.label}: ${Number(ctx.raw).toLocaleString()}`,
+                    },
+                  },
+                },
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-/* ── Area ──────────────────────────────────────────────────────────── */
-function AreaChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data} margin={{ top: 14, right: 16, bottom: 20, left: 8 }}>
-        <defs>
-          {numericKeys.map((key, i) => (
-            <linearGradient key={key} id={`area-grad-${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.40} />
-              <stop offset="100%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.04} />
-            </linearGradient>
-          ))}
-        </defs>
-        <CartesianGrid vertical={false} stroke={GRID_COLOR} />
-        <XAxis dataKey={xKey} {...axisProps} interval="preserveStartEnd" minTickGap={16} tickFormatter={trim} />
-        <YAxis {...axisProps} width={52} />
-        <Tooltip content={<CustomTooltip />} />
-        {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: AXIS_COLOR }} />}
-        {numericKeys.map((key, i) => (
-          <Area key={key} type="monotone" dataKey={key}
-            stroke={CHART_COLORS[i % CHART_COLORS.length]}
-            fill={`url(#area-grad-${i})`}
-            strokeWidth={2.5}
-            connectNulls
-            isAnimationActive={false}
-          />
-        ))}
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
+  /* ── KPI cards ── */
+  if (activeType === 'kpi') {
+    return (
+      <div className="flex flex-col h-full gap-3">
+        <TypeSelector active={activeType} onChange={setActiveType} />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 content-start">
+          {numericCols.slice(0, 6).map((col, i) => {
+            const vals = data.map((r) => Number(r[col]) || 0);
+            const value =
+              vals.length === 1
+                ? vals[0]
+                : vals.reduce((a, b) => a + b, 0) / vals.length;
+            return (
+              <div
+                key={col}
+                className="flex flex-col gap-2 rounded-lg border border-border bg-base-1 p-4"
+                style={{ boxShadow: 'var(--ds-shadow-sm)' }}
+              >
+                <span className="text-[11px] font-semibold text-content-3 uppercase tracking-wide truncate">
+                  {col.replace(/_/g, ' ')}
+                </span>
+                <span
+                  className="text-[26px] font-bold tracking-tight leading-none"
+                  style={{ color: colors[i % colors.length] }}
+                >
+                  {value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </span>
+                <span className="text-[11px] text-content-3">
+                  {vals.length === 1 ? 'single record' : `avg of ${vals.length} records`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
-/* ── Pie ───────────────────────────────────────────────────────────── */
-function PieChartView({ data, xKey, numericKeys }: { data: ChartRow[]; xKey: string; numericKeys: string[]; }) {
-  const valueKey = numericKeys[0] || Object.keys(data[0])[1];
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey={valueKey}
-          nameKey={xKey}
-          cx="50%" cy="50%"
-          outerRadius="75%" innerRadius="42%"
-          strokeWidth={2}
-          stroke="#0f0f11"
-          isAnimationActive={false}
-          label={({ name, percent }: { name?: string; percent?: number }) =>
-            `${name ?? ''} (${((percent ?? 0) * 100).toFixed(0)}%)`}
-          labelLine={{ stroke: AXIS_COLOR }}
+  /* ── Table view ── */
+  if (activeType === 'table') {
+    const cols = Object.keys(data[0]);
+    return (
+      <div className="flex flex-col h-full gap-3">
+        <TypeSelector active={activeType} onChange={setActiveType} />
+        <div
+          className="flex-1 min-h-0 overflow-auto rounded-md border border-border"
+          style={{ boxShadow: 'var(--ds-shadow-inset)' }}
         >
-          {data.map((_, i) => (
-            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip content={<CustomTooltip />} />
-        <Legend wrapperStyle={{ fontSize: 11, color: AXIS_COLOR }} />
-      </PieChart>
-    </ResponsiveContainer>
-  );
-}
-
-/* ── KPI Cards ─────────────────────────────────────────────────────── */
-function KPIView({ data, keys }: { data: ChartRow[]; keys: string[]; }) {
-  const row = data[0];
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 h-full content-center">
-      {keys.map((key, i) => {
-        const val = row[key];
-        const isNum = typeof val === 'number';
-        return (
-          <div
-            key={key}
-            className="flex flex-col justify-center rounded-lg border border-border bg-base-2 p-5 hover:border-[var(--ds-border-moderate)] transition-[border-color] duration-[100ms]"
-          >
-            <p className="text-[11px] font-medium text-content-3 uppercase tracking-wider mb-2">
-              {key.replace(/_/g, ' ')}
-            </p>
-            <p className="text-[22px] font-bold" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
-              {isNum ? val.toLocaleString() : String(val ?? '—')}
-            </p>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ── Table View ────────────────────────────────────────────────────── */
-function TableView({ data, keys }: { data: ChartRow[]; keys: string[]; }) {
-  return (
-    <div
-      className="h-full overflow-auto rounded-md border border-border bg-base-0 custom-scrollbar"
-      style={{ boxShadow: 'var(--ds-shadow-inset)' }}
-    >
-      <table className="w-full border-collapse">
-        <thead className="sticky top-0 z-10">
-          <tr>
-            {keys.map((key) => (
-              <th
-                key={key}
-                className="border-b border-border bg-base-2 px-3 py-2.5 text-left text-[11px] font-medium text-content-3 uppercase tracking-wide whitespace-nowrap"
-              >
-                {key}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr key={i} className="border-b border-border/50 hover:bg-base-2 transition-colors duration-[100ms]">
-              {keys.map((key) => (
-                <td key={key} className="px-3 py-2.5 text-[12px] text-content-1 font-mono whitespace-nowrap">
-                  {typeof row[key] === 'number' ? (row[key] as number).toLocaleString() : String(row[key] ?? '')}
-                </td>
+          <table className="w-full text-left border-collapse text-[12px]">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-border bg-base-2 select-none">
+                {cols.map((c) => (
+                  <th key={c} className="px-3 py-2.5 font-medium text-content-3 whitespace-nowrap">
+                    {c.replace(/_/g, ' ')}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--ds-border-subtle)]">
+              {data.slice(0, 100).map((row, ri) => (
+                <tr
+                  key={ri}
+                  className="hover:bg-base-2 transition-colors duration-[100ms]"
+                >
+                  {cols.map((c) => (
+                    <td key={c} className="px-3 py-2 text-content-2 font-mono whitespace-nowrap">
+                      {String(row[c] ?? '—')}
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
+
+/* Keep legacy default export for any other imports */
+export { ChartPanel as default };

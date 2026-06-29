@@ -1,100 +1,145 @@
 'use client';
 
-import { Users, TrendingUp, BarChart3 } from 'lucide-react';
 import { useMemo } from 'react';
+import { Rows3, TrendingUp, BarChart3, Hash } from 'lucide-react';
 
 interface StatsCardsProps {
   data: Record<string, unknown>[];
+  executionTime?: number;
 }
 
-export const StatsCards = ({ data }: StatsCardsProps) => {
-  const metrics = useMemo(() => {
-    const totalRecords = data?.length || 0;
+interface KPICard {
+  label: string;
+  value: string;
+  sub: string;
+  icon: React.ElementType;
+  accent: string;
+  trend?: { label: string; up: boolean };
+}
 
-    if (totalRecords === 0) {
-      return [
-        { icon: Users,    label: 'Rows Returned', value: '0',    sub: 'Awaiting run',     color: 'text-brand' },
-        { icon: TrendingUp, label: 'Average Value', value: '0.00', sub: 'No data',          color: 'text-success' },
-        { icon: BarChart3,  label: 'Highest Value', value: '—',    sub: 'Static shell',     color: 'text-warning' },
-      ];
-    }
-
-    const itemKeys = Object.keys(data[0]);
-    const numericKeys = itemKeys.filter((k) =>
+export const StatsCards = ({ data, executionTime }: StatsCardsProps) => {
+  const cards = useMemo<KPICard[]>(() => {
+    const totalRows = data?.length ?? 0;
+    const cols = totalRows > 0 ? Object.keys(data[0]) : [];
+    const numericCols = cols.filter((k) =>
       data.some((r) => typeof r[k] === 'number' && !isNaN(r[k] as number))
     );
 
-    let activeLabel = 'Row Baseline';
-    let formattedAvg = '0.00';
-    let formattedPeak = '—';
-    let growthNote = 'Symmetrical profile';
+    if (totalRows === 0) {
+      return [
+        { label: 'Total Rows',   value: '—', sub: 'Awaiting query',  icon: Rows3,      accent: '#2563eb', },
+        { label: 'Mean Value',   value: '—', sub: 'No numeric data',  icon: TrendingUp, accent: '#15803d', },
+        { label: 'Peak Value',   value: '—', sub: 'No numeric data',  icon: BarChart3,  accent: '#d97706', },
+      ];
+    }
 
-    if (numericKeys.length > 0) {
-      const key = numericKeys[numericKeys.length - 1];
-      activeLabel = key.replace(/_/g, ' ').toUpperCase();
-      const nums = data.map((r) => Number(r[key]) || 0);
-      const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+    let meanLabel = 'Mean';
+    let meanValue = '—';
+    let peakValue = '—';
+    let peakSub   = 'Upper bound';
+
+    if (numericCols.length > 0) {
+      const col  = numericCols[numericCols.length - 1];
+      meanLabel  = col.replace(/_/g, ' ');
+      const nums = data.map((r) => Number(r[col]) || 0);
+      const avg  = nums.reduce((a, b) => a + b, 0) / nums.length;
       const peak = Math.max(...nums);
-      formattedAvg = mean.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
-      formattedPeak = peak.toLocaleString();
-      growthNote = peak > mean * 1.5 ? 'Above normal range' : 'Within expected range';
-    } else {
-      const strCols = itemKeys.filter((k) => typeof data[0][k] === 'string');
-      if (strCols.length > 0) {
-        activeLabel = `UNIQUE ${strCols[0].toUpperCase()}`;
-        formattedAvg = `${new Set(data.map((r) => String(r[strCols[0]] || ''))).size} sets`;
-        growthNote = 'Categorical mapping';
+      meanValue  = avg.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      peakValue  = peak.toLocaleString();
+      peakSub    = peak > avg * 1.5 ? 'Above mean range' : 'Within expected range';
+    } else if (cols.length > 0) {
+      const strCol = cols.find((k) => typeof data[0][k] === 'string');
+      if (strCol) {
+        meanLabel = strCol.replace(/_/g, ' ');
+        meanValue = `${new Set(data.map((r) => String(r[strCol] || ''))).size}`;
+        peakSub   = 'Unique values';
       }
     }
 
     return [
       {
-        icon: Users,
-        label: 'Rows Returned',
-        value: totalRecords.toLocaleString(),
-        sub: `${itemKeys.length} active fields`,
-        color: 'text-brand',
+        label: 'Total Rows',
+        value: totalRows.toLocaleString(),
+        sub: `${cols.length} column${cols.length !== 1 ? 's' : ''}`,
+        icon: Rows3,
+        accent: '#2563eb',
+        trend: executionTime !== undefined
+          ? { label: `${executionTime}ms`, up: executionTime < 200 }
+          : undefined,
       },
       {
+        label: `Mean · ${meanLabel}`,
+        value: meanValue,
+        sub: 'Average across dataset',
         icon: TrendingUp,
-        label: `Mean: ${activeLabel}`,
-        value: formattedAvg,
-        sub: growthNote,
-        color: 'text-success',
+        accent: '#15803d',
       },
       {
-        icon: BarChart3,
         label: 'Peak Value',
-        value: formattedPeak,
-        sub: 'Upper bound',
-        color: 'text-warning',
+        value: peakValue,
+        sub: peakSub,
+        icon: BarChart3,
+        accent: '#d97706',
       },
     ];
-  }, [data]);
+  }, [data, executionTime]);
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      {metrics.map((stat, idx) => (
-        <div
-          key={idx}
-          className="group rounded-lg border border-border bg-base-2 p-4 hover:border-[var(--ds-border-moderate)] transition-[border-color] duration-[100ms]"
-        >
-          <div className="mb-3 flex items-start justify-between">
-            <span className="text-[11px] font-medium tracking-wide text-content-3 uppercase">
-              {stat.label}
-            </span>
-            <div className="rounded-md bg-base-3 p-1.5 transition-colors duration-[100ms] group-hover:bg-base-4">
-              <stat.icon className={`h-4 w-4 ${stat.color}`} />
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {cards.map((card, i) => {
+        const Icon = card.icon;
+        return (
+          <div
+            key={i}
+            className="relative flex flex-col gap-3 rounded-xl border border-border bg-base-0 p-5 overflow-hidden"
+            style={{ boxShadow: 'var(--ds-shadow-sm)' }}
+          >
+            {/* Accent left stripe */}
+            <div
+              className="absolute left-0 top-4 bottom-4 w-0.5 rounded-r-full"
+              style={{ background: card.accent }}
+            />
+
+            {/* Header row */}
+            <div className="flex items-start justify-between pl-3">
+              <span className="text-[11px] font-semibold text-content-3 uppercase tracking-wider leading-none truncate max-w-[80%]">
+                {card.label}
+              </span>
+              <div
+                className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: `${card.accent}14` }}
+              >
+                <Icon className="h-3.5 w-3.5" style={{ color: card.accent }} />
+              </div>
             </div>
+
+            {/* Value */}
+            <div className="pl-3">
+              <p className="text-[28px] font-bold tracking-tight text-content-1 leading-none">
+                {card.value}
+              </p>
+              <p className="mt-1.5 text-[12px] text-content-3">{card.sub}</p>
+            </div>
+
+            {/* Optional trend badge */}
+            {card.trend && (
+              <div className="pl-3">
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5"
+                  style={
+                    card.trend.up
+                      ? { background: 'var(--ds-success-muted)', color: 'var(--ds-success)' }
+                      : { background: 'var(--ds-warning-muted)', color: 'var(--ds-warning)' }
+                  }
+                >
+                  <Hash className="h-3 w-3" />
+                  {card.trend.label}
+                </span>
+              </div>
+            )}
           </div>
-          <div className="space-y-0.5">
-            <p className="text-[22px] font-semibold tracking-tight text-content-1">
-              {stat.value}
-            </p>
-            <p className="text-[12px] text-content-3">{stat.sub}</p>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

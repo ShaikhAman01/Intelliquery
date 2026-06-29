@@ -4,8 +4,6 @@ import { AuthGuard, useSession } from '@/lib/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -15,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import {
   User, Building2, Users, Shield, Mail, Copy, Check,
-  Loader2, AlertCircle, X, CheckCircle2, XCircle, ArrowLeft,
+  Loader2, AlertCircle, CheckCircle2, XCircle, ArrowLeft,
 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -39,106 +37,144 @@ export default function SettingsPage() {
   );
 }
 
-/* ── Inline status alert ──────────────────────────────────────────── */
+/* ── Status message ──────────────────────────────────────── */
 
 function StatusMessage({ message, type }: { message: string; type: 'success' | 'error' }) {
   if (!message) return null;
   return (
     <div
-      className={`flex items-center gap-2.5 text-[13px] px-3 py-2.5 rounded-md ${
-        type === 'success' ? 'text-success' : 'text-error'
-      }`}
+      className="flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-[13px]"
       style={{
         background: type === 'success' ? 'var(--ds-success-muted)' : 'var(--ds-error-muted)',
         border: `1px solid ${type === 'success' ? 'var(--ds-success-border)' : 'var(--ds-error-border)'}`,
+        color: type === 'success' ? 'var(--ds-success)' : 'var(--ds-error)',
       }}
     >
       {type === 'error'
-        ? <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-        : <Check className="h-3.5 w-3.5 shrink-0" />
+        ? <AlertCircle className="h-4 w-4 shrink-0" />
+        : <Check className="h-4 w-4 shrink-0" />
       }
       <span>{message}</span>
     </div>
   );
 }
 
-/* ── Page shell ───────────────────────────────────────────────────── */
+/* ── Page layout ─────────────────────────────────────────── */
+
+type Tab = 'profile' | 'organization' | 'team';
 
 function SettingsContent() {
   const { user } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('profile');
-  const [org, setOrg] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<Tab>('profile');
+  const [org, setOrg] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     getOrganization()
-      .then((data) => { if (data?.org) setOrg(data.org); })
+      .then((data: { org?: Record<string, unknown> }) => { if (data?.org) setOrg(data.org); })
       .catch(() => {});
   }, []);
 
+  const NAV: { key: Tab; label: string; Icon: React.ElementType }[] = [
+    { key: 'profile',      label: 'Profile',      Icon: User      },
+    { key: 'organization', label: 'Organization', Icon: Building2 },
+    { key: 'team',         label: 'Team',         Icon: Users     },
+  ];
+
   return (
-    <div className="min-h-screen bg-base-0 text-content-1 flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--ds-base-0)' }}>
 
       {/* Top bar */}
-      <div className="h-12 flex-shrink-0 flex items-center justify-between border-b border-border bg-base-1 px-6">
+      <div
+        className="h-14 flex-shrink-0 flex items-center justify-between border-b border-border px-6"
+        style={{ background: 'var(--ds-base-1)' }}
+      >
         <Button
           variant="ghost"
           size="sm"
           onClick={() => router.push('/')}
-          className="gap-1.5 text-content-3 hover:text-content-1 -ml-2"
+          className="gap-1.5 text-content-3 hover:text-content-1 -ml-1 text-[13px]"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to workspace
+          Back
         </Button>
-        <span className="text-[13px] font-semibold text-content-1">Settings</span>
-        {/* balance spacer */}
-        <div className="w-[148px]" />
+        <span className="text-[14px] font-semibold text-content-1">Settings</span>
+        <div className="w-16" />
       </div>
 
-      <main className="flex-1 overflow-y-auto custom-scrollbar px-6 py-8 md:px-12">
-        <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex flex-1 overflow-hidden">
 
-          <PendingInvitesBanner />
+        {/* Left sidebar nav */}
+        <aside
+          className="hidden sm:flex w-[200px] flex-shrink-0 flex-col border-r border-border p-4 gap-1"
+          style={{ background: 'var(--ds-base-1)' }}
+        >
+          {NAV.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={[
+                'flex items-center gap-2.5 w-full rounded-lg px-3 py-2.5 text-[14px] text-left transition-colors duration-[100ms]',
+                activeTab === key
+                  ? 'bg-base-3 text-content-1 font-medium'
+                  : 'text-content-3 hover:bg-base-2 hover:text-content-1',
+              ].join(' ')}
+            >
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              {label}
+            </button>
+          ))}
+        </aside>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-0">
-            {/* Tab bar */}
-            <div className="border-b border-border">
-              <TabsList>
-                <TabsTrigger value="profile" className="flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5" />
-                  Profile
-                </TabsTrigger>
-                <TabsTrigger value="organization" className="flex items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5" />
-                  Organization
-                </TabsTrigger>
-                <TabsTrigger value="team" className="flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5" />
-                  Team
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <div className="pt-6">
-              <TabsContent value="profile" className="m-0">
-                <ProfileTab user={user} />
-              </TabsContent>
-              <TabsContent value="organization" className="m-0">
-                <OrgTab existingOrg={org} setExistingOrg={setOrg} />
-              </TabsContent>
-              <TabsContent value="team" className="m-0">
-                <TeamTab orgSlug={org?.slug} />
-              </TabsContent>
-            </div>
-          </Tabs>
-
+        {/* Mobile tab row */}
+        <div className="sm:hidden w-full absolute top-14 z-10 flex border-b border-border" style={{ background: 'var(--ds-base-1)' }}>
+          {NAV.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={[
+                'flex-1 py-3 text-[13px] font-medium border-b-2 transition-colors duration-[100ms]',
+                activeTab === key
+                  ? 'border-brand text-brand'
+                  : 'border-transparent text-content-3',
+              ].join(' ')}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-      </main>
+
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar px-6 py-8 sm:px-10 sm:pt-8">
+          <div className="max-w-2xl mx-auto space-y-6">
+
+            <PendingInvitesBanner />
+
+            {activeTab === 'profile'      && <ProfileTab user={user} />}
+            {activeTab === 'organization' && <OrgTab existingOrg={org} setExistingOrg={setOrg} />}
+            {activeTab === 'team'         && <TeamTab orgSlug={org?.slug as string | undefined} />}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
 
-/* ── Pending invites banner ───────────────────────────────────────── */
+/* ── Section layout helpers ──────────────────────────────── */
+
+function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border overflow-hidden" style={{ background: 'var(--ds-base-0)', boxShadow: 'var(--ds-shadow-sm)' }}>
+      <div className="px-6 py-4 border-b border-border" style={{ background: 'var(--ds-base-1)' }}>
+        <h3 className="text-[15px] font-semibold text-content-1">{title}</h3>
+        {description && <p className="mt-0.5 text-[13px] text-content-3">{description}</p>}
+      </div>
+      <div className="p-6">{children}</div>
+    </div>
+  );
+}
+
+/* ── Pending invites ─────────────────────────────────────── */
 
 interface Invite {
   id: number;
@@ -160,99 +196,85 @@ function PendingInvitesBanner() {
     try {
       const data = await getMyInvites();
       setInvites(data.invites || []);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchInvites(); }, [fetchInvites]);
 
-  const handleAccept = async (inviteId: number) => {
-    setActionLoading(inviteId);
-    setMsg(null);
+  const handleAccept = async (id: number) => {
+    setActionLoading(id); setMsg(null);
     try {
-      const data = await acceptInvite(inviteId);
+      const data = await acceptInvite(id);
       setMsg({ text: data.message, type: 'success' });
-      setInvites((prev) => prev.filter((i) => i.id !== inviteId));
-    } catch (err: any) {
-      setMsg({ text: err.response?.data?.detail || 'Failed to accept invite.', type: 'error' });
-    } finally {
-      setActionLoading(null);
-    }
+      setInvites(prev => prev.filter(i => i.id !== id));
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setMsg({ text: e.response?.data?.detail || 'Failed to accept invite.', type: 'error' });
+    } finally { setActionLoading(null); }
   };
 
-  const handleDecline = async (inviteId: number) => {
-    setActionLoading(inviteId);
-    setMsg(null);
+  const handleDecline = async (id: number) => {
+    setActionLoading(id); setMsg(null);
     try {
-      const data = await declineInvite(inviteId);
+      const data = await declineInvite(id);
       setMsg({ text: data.message, type: 'success' });
-      setInvites((prev) => prev.filter((i) => i.id !== inviteId));
-    } catch (err: any) {
-      setMsg({ text: err.response?.data?.detail || 'Failed to decline invite.', type: 'error' });
-    } finally {
-      setActionLoading(null);
-    }
+      setInvites(prev => prev.filter(i => i.id !== id));
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setMsg({ text: e.response?.data?.detail || 'Failed to decline invite.', type: 'error' });
+    } finally { setActionLoading(null); }
   };
 
-  if (loading || invites.length === 0) {
-    return msg ? (
-      <div className="mb-2">
-        <StatusMessage message={msg.text} type={msg.type} />
-      </div>
-    ) : null;
-  }
+  if (loading || (invites.length === 0 && !msg)) return null;
 
   return (
     <div className="space-y-2">
       {msg && <StatusMessage message={msg.text} type={msg.type} />}
-      {invites.map((invite) => (
+      {invites.map(invite => (
         <div
           key={invite.id}
-          className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-[var(--ds-border-moderate)] bg-base-2 px-4 py-3"
-          style={{ boxShadow: 'var(--ds-shadow-sm)' }}
+          className="flex flex-wrap items-center justify-between gap-4 rounded-xl border px-4 py-3.5"
+          style={{
+            background: 'var(--ds-base-1)',
+            border: '1px solid var(--ds-border-moderate)',
+            boxShadow: 'var(--ds-shadow-sm)',
+          }}
         >
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-md bg-base-0 border border-border flex items-center justify-center">
-              <Mail className="h-3.5 w-3.5 text-content-3" />
+            <div
+              className="h-9 w-9 rounded-lg border border-border flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--ds-base-0)' }}
+            >
+              <Mail className="h-4 w-4 text-content-3" />
             </div>
-            <div className="text-[13px]">
-              <p className="text-content-1">
+            <div>
+              <p className="text-[13px] text-content-1">
                 <span className="font-semibold">{invite.inviter_name || invite.inviter_email}</span>
                 {' '}invited you to join{' '}
                 <span className="font-semibold">{invite.org_name}</span>
               </p>
-              <p className="text-[11px] text-content-3 mt-0.5">
-                Role: <span className="capitalize">{invite.role}</span>
-              </p>
+              <p className="text-[12px] text-content-3 mt-0.5 capitalize">Role: {invite.role}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Button
               size="sm"
               variant="ghost"
-              className="text-error hover:text-error"
-              style={{ ['--hover-bg' as string]: 'var(--ds-error-muted)' }}
+              className="h-8 gap-1.5 text-[13px] text-error hover:bg-[var(--ds-error-muted)] hover:text-error"
               onClick={() => handleDecline(invite.id)}
               disabled={actionLoading === invite.id}
             >
-              {actionLoading === invite.id
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <XCircle className="h-3.5 w-3.5" />
-              }
+              {actionLoading === invite.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
               Decline
             </Button>
             <Button
               size="sm"
+              className="h-8 gap-1.5 text-[13px]"
               onClick={() => handleAccept(invite.id)}
               disabled={actionLoading === invite.id}
             >
-              {actionLoading === invite.id
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <CheckCircle2 className="h-3.5 w-3.5" />
-              }
+              {actionLoading === invite.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
               Accept
             </Button>
           </div>
@@ -262,180 +284,175 @@ function PendingInvitesBanner() {
   );
 }
 
-/* ── Profile tab ──────────────────────────────────────────────────── */
+/* ── Profile tab ─────────────────────────────────────────── */
 
-function ProfileTab({ user }: { user: any }) {
+function ProfileTab({ user }: { user: { id?: string; name?: string | null; email?: string | null } | null | undefined }) {
   const [name, setName] = useState(user?.name || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  const initial = (user?.name?.[0] || user?.email?.[0] || 'U').toUpperCase();
+
   const handleSave = async () => {
     if (!name.trim()) return;
-    setSaving(true);
-    setMsg(null);
+    setSaving(true); setMsg(null);
     try {
       await updateProfile(name.trim());
-      setMsg({ text: 'Profile updated successfully.', type: 'success' });
-    } catch (err: any) {
-      setMsg({ text: err.response?.data?.detail || 'Failed to update profile.', type: 'error' });
-    } finally {
-      setSaving(false);
-    }
+      setMsg({ text: 'Profile updated.', type: 'success' });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setMsg({ text: e.response?.data?.detail || 'Failed to update profile.', type: 'error' });
+    } finally { setSaving(false); }
   };
 
   return (
-    <Card>
-      <CardHeader className="border-b border-border pt-5">
-        <CardTitle>User Profile</CardTitle>
-        <CardDescription>Your personal info and preferences</CardDescription>
-      </CardHeader>
-      <CardContent className="pt-5 pb-6 space-y-5">
-
+    <Section title="Profile" description="Your personal information">
+      <div className="space-y-5">
         {/* Avatar row */}
-        <div
-          className="flex items-center gap-3 rounded-md bg-base-0 border border-border px-4 py-3"
-          style={{ boxShadow: 'var(--ds-shadow-inset)' }}
-        >
-          <div className="h-10 w-10 rounded-md bg-base-2 border border-border flex items-center justify-center text-[15px] font-bold text-content-1 select-none">
-            {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? '?'}
+        <div className="flex items-center gap-4">
+          <div
+            className="h-14 w-14 rounded-xl flex items-center justify-center text-[20px] font-bold text-white select-none flex-shrink-0"
+            style={{ background: 'var(--ds-accent)' }}
+          >
+            {initial}
           </div>
           <div>
-            <p className="text-[13px] font-semibold text-content-1">{user?.name || 'No name set'}</p>
-            <p className="text-[11px] text-content-3 font-mono">{user?.email}</p>
+            <p className="text-[15px] font-semibold text-content-1">{user?.name || 'No name set'}</p>
+            <p className="text-[13px] text-content-3 font-mono mt-0.5">{user?.email}</p>
           </div>
         </div>
 
-        {/* Fields */}
+        <div className="h-px border-t border-border" />
+
         <div className="grid gap-4 max-w-md">
-          <div className="space-y-1.5">
-            <Label htmlFor="profile-name">Display Name</Label>
-            <Input
-              id="profile-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-            />
+          <div className="space-y-2">
+            <Label htmlFor="profile-name" className="text-[13px] font-medium text-content-2">Display name</Label>
+            <Input id="profile-name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className="h-10" />
           </div>
-          <div className="space-y-1.5">
-            <Label>Email</Label>
-            <Input value={user?.email || ''} disabled className="font-mono text-[12px]" />
-            <p className="text-[11px] text-content-3">Email changes are managed through your auth provider</p>
+          <div className="space-y-2">
+            <Label className="text-[13px] font-medium text-content-2">Email address</Label>
+            <Input value={user?.email || ''} disabled className="h-10 font-mono text-[12px]" />
+            <p className="text-[12px] text-content-3">Email changes are managed through your auth provider.</p>
           </div>
-          <div className="space-y-1.5">
-            <Label>User ID</Label>
-            <Input value={user?.id || ''} disabled className="font-mono text-[12px]" />
+          <div className="space-y-2">
+            <Label className="text-[13px] font-medium text-content-2">User ID</Label>
+            <Input value={user?.id || ''} disabled className="h-10 font-mono text-[11px]" />
           </div>
-
-          {msg && <StatusMessage message={msg.text} type={msg.type} />}
-
-          <Button
-            onClick={handleSave}
-            disabled={saving || !name.trim()}
-            className="w-fit"
-          >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            Save Changes
-          </Button>
         </div>
-      </CardContent>
-    </Card>
+
+        {msg && <StatusMessage message={msg.text} type={msg.type} />}
+
+        <Button onClick={handleSave} disabled={saving || !name.trim()} className="gap-2">
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          Save changes
+        </Button>
+      </div>
+    </Section>
   );
 }
 
-/* ── Organization tab ─────────────────────────────────────────────── */
+/* ── Organization tab ────────────────────────────────────── */
 
-function OrgTab({ existingOrg, setExistingOrg }: { existingOrg: any; setExistingOrg: React.Dispatch<any> }) {
-  const [orgName, setOrgName] = useState(existingOrg?.name || '');
+function OrgTab({ existingOrg, setExistingOrg }: {
+  existingOrg: Record<string, unknown> | null;
+  setExistingOrg: React.Dispatch<React.SetStateAction<Record<string, unknown> | null>>;
+}) {
+  const [orgName, setOrgName] = useState((existingOrg?.name as string) || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  useEffect(() => { setOrgName(existingOrg?.name || ''); }, [existingOrg]);
+  useEffect(() => { setOrgName((existingOrg?.name as string) || ''); }, [existingOrg]);
 
   const handleSave = async () => {
     if (!orgName.trim()) return;
-    setSaving(true);
-    setMsg(null);
+    setSaving(true); setMsg(null);
     try {
       if (existingOrg) {
         await updateOrganization(orgName.trim());
-        setMsg({ text: 'Organization updated successfully.', type: 'success' });
+        setMsg({ text: 'Organization updated.', type: 'success' });
         setExistingOrg({ ...existingOrg, name: orgName.trim() });
       } else {
         const data = await createOrganization(orgName.trim());
         setExistingOrg({ id: data.org_id, name: data.name, slug: data.slug });
         setMsg({ text: `Organization "${data.name}" created.`, type: 'success' });
       }
-    } catch (err: any) {
-      setMsg({ text: err.response?.data?.detail || 'Failed to save organization.', type: 'error' });
-    } finally {
-      setSaving(false);
-    }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setMsg({ text: e.response?.data?.detail || 'Failed to save organization.', type: 'error' });
+    } finally { setSaving(false); }
   };
 
   return (
-    <Card>
-      <CardHeader className="border-b border-border pt-5">
-        <CardTitle>Organization</CardTitle>
-        <CardDescription>
-          {existingOrg ? `Managing "${existingOrg.name}"` : 'Create a team workspace'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-5 pb-6 space-y-5">
-
-        <div className="grid gap-4 max-w-md">
-          <div className="space-y-1.5">
-            <Label htmlFor="org-name">Organization Name</Label>
-            <Input
-              id="org-name"
-              value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
-              placeholder="e.g. Acme Corp"
-            />
-          </div>
-          {existingOrg && (
-            <div className="space-y-1.5">
-              <Label>Slug</Label>
-              <Input value={existingOrg.slug} disabled className="font-mono text-[12px]" />
+    <div className="space-y-4">
+      <Section
+        title="Organization"
+        description={existingOrg ? `Managing "${existingOrg.name as string}"` : 'Create a shared workspace for your team'}
+      >
+        <div className="space-y-5">
+          <div className="grid gap-4 max-w-md">
+            <div className="space-y-2">
+              <Label htmlFor="org-name" className="text-[13px] font-medium text-content-2">Organization name</Label>
+              <Input
+                id="org-name"
+                value={orgName}
+                onChange={e => setOrgName(e.target.value)}
+                placeholder="e.g. Acme Corp"
+                className="h-10"
+              />
             </div>
-          )}
+            {existingOrg && (
+              <div className="space-y-2">
+                <Label className="text-[13px] font-medium text-content-2">Slug</Label>
+                <Input value={(existingOrg.slug as string)} disabled className="h-10 font-mono text-[12px]" />
+              </div>
+            )}
+          </div>
 
           {msg && <StatusMessage message={msg.text} type={msg.type} />}
 
-          <Button onClick={handleSave} disabled={saving || !orgName.trim()} className="w-fit">
+          <Button onClick={handleSave} disabled={saving || !orgName.trim()} className="gap-2">
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {existingOrg ? 'Update Organization' : 'Create Organization'}
+            {existingOrg ? 'Update organization' : 'Create organization'}
           </Button>
         </div>
+      </Section>
 
-        {/* Role reference */}
-        <div className="pt-4 border-t border-border space-y-3">
-          <p className="text-[12px] text-content-3 leading-relaxed max-w-lg">
-            Organizations let you share database connections and query history securely with team members. Assign permissions to control access.
+      {/* Roles reference */}
+      <Section title="Role permissions" description="Access levels for organization members">
+        <div className="space-y-4">
+          <p className="text-[13px] text-content-3 leading-relaxed">
+            Organizations let you share database connections and query history securely across team members with fine-grained access control.
           </p>
-          <div className="flex gap-2 flex-wrap">
+          <div className="space-y-2">
             {[
-              { role: 'Owner',  color: 'var(--ds-warning)',  bg: 'var(--ds-warning-muted)',              border: 'var(--ds-warning-border)' },
-              { role: 'Admin',  color: '#60a5fa',            bg: 'rgba(37,99,235,0.10)',                 border: 'rgba(37,99,235,0.25)' },
-              { role: 'Editor', color: 'var(--ds-success)',  bg: 'var(--ds-success-muted)',              border: 'var(--ds-success-border)' },
-              { role: 'Viewer', color: 'var(--ds-text-2)',   bg: 'transparent',                          border: 'var(--ds-border-subtle)' },
-            ].map(({ role, color, bg, border }) => (
-              <span
+              { role: 'Owner',  desc: 'Full control — billing, members, all settings',    color: 'var(--ds-warning)',  bg: 'var(--ds-warning-muted)',  border: 'var(--ds-warning-border)' },
+              { role: 'Admin',  desc: 'Manage members and connections',                    color: '#60a5fa',            bg: 'rgba(37,99,235,0.08)',     border: 'rgba(37,99,235,0.20)' },
+              { role: 'Editor', desc: 'Run queries, save snippets, view all connections', color: 'var(--ds-success)',  bg: 'var(--ds-success-muted)',  border: 'var(--ds-success-border)' },
+              { role: 'Viewer', desc: 'Read-only access to shared queries',               color: 'var(--ds-text-2)',   bg: 'transparent',              border: 'var(--ds-border-subtle)' },
+            ].map(({ role, desc, color, bg, border }) => (
+              <div
                 key={role}
-                className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                style={{ color, background: bg, border: `1px solid ${border}` }}
+                className="flex items-center justify-between rounded-lg border px-3.5 py-2.5"
+                style={{ background: 'var(--ds-base-1)', border: '1px solid var(--ds-border-subtle)' }}
               >
-                <Shield className="h-3 w-3" />
-                {role}
-              </span>
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold flex-shrink-0 mr-3"
+                  style={{ color, background: bg, border: `1px solid ${border}` }}
+                >
+                  <Shield className="h-3 w-3" />
+                  {role}
+                </span>
+                <span className="text-[13px] text-content-3 flex-1">{desc}</span>
+              </div>
             ))}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </Section>
+    </div>
   );
 }
 
-/* ── Team tab ─────────────────────────────────────────────────────── */
+/* ── Team tab ────────────────────────────────────────────── */
 
 interface TeamMember {
   id: string;
@@ -457,18 +474,15 @@ function TeamTab({ orgSlug }: { orgSlug: string | undefined }) {
     try {
       const data = await getTeamMembers();
       setMembers(data.members || []);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
   const handleCopyInvite = () => {
     if (!orgSlug) {
-      setMsg({ text: 'Create an organization first to generate a workspace link.', type: 'error' });
+      setMsg({ text: 'Create an organization first to generate an invite link.', type: 'error' });
       return;
     }
     navigator.clipboard.writeText(`${window.location.origin}/invite/${orgSlug}`);
@@ -478,40 +492,39 @@ function TeamTab({ orgSlug }: { orgSlug: string | undefined }) {
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
-    setInviting(true);
-    setMsg(null);
+    setInviting(true); setMsg(null);
     try {
       const data = await inviteTeamMember(inviteEmail.trim(), inviteRole);
       setMsg({ text: data.message, type: 'success' });
       setInviteEmail('');
-    } catch (err: any) {
-      setMsg({ text: err.response?.data?.detail || 'Failed to send invite.', type: 'error' });
-    } finally {
-      setInviting(false);
-    }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setMsg({ text: e.response?.data?.detail || 'Failed to send invite.', type: 'error' });
+    } finally { setInviting(false); }
+  };
+
+  const roleColor: Record<string, string> = {
+    owner: 'var(--ds-warning)',
+    admin: '#60a5fa',
+    editor: 'var(--ds-success)',
+    viewer: 'var(--ds-text-3)',
   };
 
   return (
-    <Card>
-      <CardHeader className="border-b border-border pt-5">
-        <CardTitle>Team Members</CardTitle>
-        <CardDescription>Invite and manage access to your workspace.</CardDescription>
-      </CardHeader>
-      <CardContent className="pt-5 pb-6 space-y-6">
-
-        {/* Invite form */}
-        <div className="space-y-3">
-          <Label>Invite Member</Label>
+    <div className="space-y-4">
+      <Section title="Invite members" description="Send email invitations to collaborate">
+        <div className="space-y-4">
           <div className="flex flex-wrap sm:flex-nowrap gap-2">
             <Input
               value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
+              onChange={e => setInviteEmail(e.target.value)}
               placeholder="colleague@company.com"
               type="email"
-              className="min-w-0 flex-1"
+              className="h-10 min-w-0 flex-1"
+              onKeyDown={e => e.key === 'Enter' && handleInvite()}
             />
             <Select value={inviteRole} onValueChange={setInviteRole}>
-              <SelectTrigger className="w-[120px] shrink-0">
+              <SelectTrigger className="w-[120px] h-10 shrink-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -523,74 +536,74 @@ function TeamTab({ orgSlug }: { orgSlug: string | undefined }) {
             <Button
               onClick={handleInvite}
               disabled={!inviteEmail.trim() || inviting}
-              className="shrink-0"
+              className="h-10 gap-2 shrink-0"
             >
-              {inviting
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : <Mail className="h-4 w-4" />
-              }
-              Send Invite
+              {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Send invite
             </Button>
           </div>
+
           {msg && <StatusMessage message={msg.text} type={msg.type} />}
+
+          <Button variant="outline" size="sm" onClick={handleCopyInvite} className="gap-2 h-9">
+            {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? 'Link copied!' : 'Copy invite link'}
+          </Button>
         </div>
+      </Section>
 
-        {/* Copy invite link */}
-        <Button variant="outline" size="sm" onClick={handleCopyInvite} className="gap-2">
-          {copied
-            ? <Check className="h-3.5 w-3.5 text-success" />
-            : <Copy className="h-3.5 w-3.5" />
-          }
-          {copied ? 'Copied to clipboard' : 'Copy invite link'}
-        </Button>
-
-        {/* Member roster */}
-        <div className="border-t border-border pt-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] font-medium text-content-2">Active Members</span>
-            {members.length > 0 && (
-              <span className="font-mono text-[11px] bg-base-0 border border-border text-content-3 px-2 py-0.5 rounded-md">
-                {members.length}
-              </span>
-            )}
+      <Section
+        title="Active members"
+        description={members.length > 0 ? `${members.length} member${members.length !== 1 ? 's' : ''}` : undefined}
+      >
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-5 w-5 animate-spin text-content-3" />
           </div>
-
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-content-3" />
-            </div>
-          ) : members.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 rounded-md border border-dashed border-border text-center bg-base-0">
-              <Users className="h-7 w-7 text-content-3 mb-3" />
-              <p className="text-[13px] font-medium text-content-2">No team members yet</p>
-              <p className="text-[12px] text-content-3 mt-1">Invite colleagues above to get started</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {members.map((m) => (
+        ) : members.length === 0 ? (
+          <div className="flex flex-col items-center py-10 text-center gap-2">
+            <Users className="h-8 w-8 text-content-3" />
+            <p className="text-[14px] font-medium text-content-2">No team members yet</p>
+            <p className="text-[13px] text-content-3">Invite colleagues above to get started</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {members.map(m => {
+              const initial = (m.name?.[0] || m.email[0]).toUpperCase();
+              return (
                 <div
                   key={m.id}
-                  className="flex items-center justify-between px-4 py-3 rounded-md border border-border bg-base-0 hover:bg-base-1 transition-colors duration-[100ms]"
-                  style={{ boxShadow: 'var(--ds-shadow-inset)' }}
+                  className="flex items-center justify-between rounded-xl border border-border px-4 py-3 transition-colors hover:bg-base-1"
+                  style={{ background: 'var(--ds-base-0)' }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-md bg-base-2 border border-border flex items-center justify-center text-[13px] font-bold text-content-1 select-none">
-                      {m.name?.[0]?.toUpperCase() ?? m.email[0].toUpperCase()}
+                    <div
+                      className="h-9 w-9 rounded-lg flex items-center justify-center text-[13px] font-bold text-white select-none flex-shrink-0"
+                      style={{ background: roleColor[m.role] || 'var(--ds-accent)' }}
+                    >
+                      {initial}
                     </div>
                     <div>
-                      <p className="text-[13px] font-medium text-content-1">{m.name || 'Invite Pending'}</p>
-                      <p className="text-[11px] text-content-3 font-mono">{m.email}</p>
+                      <p className="text-[14px] font-medium text-content-1">{m.name || 'Invite pending'}</p>
+                      <p className="text-[12px] text-content-3 font-mono">{m.email}</p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-medium text-content-2 capitalize bg-base-2 border border-border px-2.5 py-0.5 rounded-full">
+                  <span
+                    className="text-[11px] font-semibold capitalize rounded-full px-2.5 py-0.5 border"
+                    style={{
+                      color: roleColor[m.role] || 'var(--ds-text-2)',
+                      background: 'var(--ds-base-1)',
+                      borderColor: 'var(--ds-border-subtle)',
+                    }}
+                  >
                     {m.role}
                   </span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+              );
+            })}
+          </div>
+        )}
+      </Section>
+    </div>
   );
 }

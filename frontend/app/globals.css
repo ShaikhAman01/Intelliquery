@@ -90,12 +90,131 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Design System Custom Properties
+   Design System Custom Properties — LIGHT MODE (default)
    ═══════════════════════════════════════════════════════════════ */
 :root {
   /* ── Elevation surfaces ───────────────────────────────────────
-     Named by elevation level (0 = deepest / darkest).
-     An element can never use a level darker than its parent.     */
+     Light mode: 0 = white (highest/lightest), 5 = deepest gray */
+  --ds-base-0: #ffffff;
+  --ds-base-1: #f7f8fa;
+  --ds-base-2: #f0f2f5;
+  --ds-base-3: #e6e9ef;
+  --ds-base-4: #d8dce6;
+  --ds-base-5: #c4cad8;
+
+  /* ── Borders ─────────────────────────────────────────────────
+     Opacity-black on white background                           */
+  --ds-border-subtle:   rgba(0, 0, 0, 0.06);
+  --ds-border-moderate: rgba(0, 0, 0, 0.11);
+  --ds-border-strong:   rgba(0, 0, 0, 0.18);
+  --ds-border-accent:   rgba(37, 99, 235, 0.35);
+
+  /* ── Text hierarchy ──────────────────────────────────────────*/
+  --ds-text-1:    #0f172a;
+  --ds-text-2:    #3d4966;
+  --ds-text-3:    #8a95a8;
+  --ds-text-code: #1e293b;
+
+  /* ── Brand accent ─────────────────────────────────────────── */
+  --ds-accent:        #2563eb;
+  --ds-accent-hover:  #1d4ed8;
+  --ds-accent-muted:  rgba(37, 99, 235, 0.08);
+  --ds-accent-subtle: rgba(37, 99, 235, 0.04);
+
+  /* ── Semantic ─────────────────────────────────────────────── */
+  --ds-success:        #15803d;
+  --ds-success-muted:  rgba(21, 128, 61, 0.08);
+  --ds-success-border: rgba(21, 128, 61, 0.18);
+
+  --ds-error:          #dc2626;
+  --ds-error-muted:    rgba(220, 38, 38, 0.08);
+  --ds-error-border:   rgba(220, 38, 38, 0.18);
+
+  --ds-warning:        #d97706;
+  --ds-warning-muted:  rgba(217, 119, 6, 0.08);
+  --ds-warning-border: rgba(217, 119, 6, 0.18);
+
+  --ds-info:           #2563eb;
+  --ds-info-muted:     rgba(37, 99, 235, 0.08);
+  --ds-info-border:    rgba(37, 99, 235, 0.18);
+
+  /* ── Shadows — light mode: soft drops, no overlay ring ───── */
+  --ds-shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+  --ds-shadow-sm:    0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --ds-shadow-md:    0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --ds-shadow-lg:    0 8px 24px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --ds-shadow-xl:    0 20px 48px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --ds-shadow-focus: 0 0 0 3px rgba(37, 99, 235, 0.20);
+
+  /* ── Border radius ───────────────────────────────────────────*/
+  --ds-radius-none: 0px;
+  --ds-radius-sm:   4px;
+  --ds-radius-md:   6px;
+  --ds-radius-lg:   8px;
+  --ds-radius-xl:   12px;
+  --ds-radius-2xl:  16px;
+  --ds-radius-full: 9999px;
+
+  /* ── Motion — durations ─────────────────────────────────────*/
+  --ds-duration-instant: 0ms;
+  --ds-duration-fast:    100ms;
+  --ds-duration-base:    180ms;
+  --ds-duration-slow:    260ms;
+  --ds-duration-enter:   220ms;
+  --ds-duration-exit:    160ms;
+
+  /* ── Motion — easings ────────────────────────────────────── */
+  --ds-ease-out:    cubic-bezier(0, 0, 0.2, 1);
+  --ds-ease-in:     cubic-bezier(0.4, 0, 1, 1);
+  --ds-ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── shadcn/ui tokens ────────────────────────────────────── */
+  --background:           var(--ds-base-0);
+  --foreground:           var(--ds-text-1);
+  --card:                 var(--ds-base-0);
+  --card-foreground:      var(--ds-text-1);
+  --popover:              var(--ds-base-0);
+  --popover-foreground:   var(--ds-text-1);
+  --primary:              var(--ds-accent);
+  --primary-foreground:   #ffffff;
+  --secondary:            var(--ds-base-2);
+  --secondary-foreground: var(--ds-text-1);
+  --muted:                var(--ds-base-2);
+  --muted-foreground:     var(--ds-text-2);
+  --accent:               var(--ds-base-2);
+  --accent-foreground:    var(--ds-text-1);
+  --destructive:          var(--ds-error);
+  --border:               var(--ds-border-subtle);
+  --input:                var(--ds-border-moderate);
+  --ring:                 var(--ds-accent);
+
+  /* Charts */
+  --chart-1: #2563eb;
+  --chart-2: #16a34a;
+  --chart-3: #d97706;
+  --chart-4: #dc2626;
+  --chart-5: #7c3aed;
+  --chart-6: #0d9488;
+
+  /* Sidebar */
+  --sidebar:                         var(--ds-base-1);
+  --sidebar-foreground:              var(--ds-text-1);
+  --sidebar-primary:                 var(--ds-accent);
+  --sidebar-primary-foreground:      #ffffff;
+  --sidebar-accent:                  var(--ds-base-3);
+  --sidebar-accent-foreground:       var(--ds-text-1);
+  --sidebar-border:                  var(--ds-border-subtle);
+  --sidebar-ring:                    var(--ds-accent);
+
+  --radius: 0.5rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Design System Custom Properties — DARK MODE
+   ═══════════════════════════════════════════════════════════════ */
+.dark {
+  /* ── Elevation surfaces ───────────────────────────────────── */
   --ds-base-0: #090909;
   --ds-base-1: #0f0f11;
   --ds-base-2: #141417;
@@ -103,23 +222,19 @@
   --ds-base-4: #242428;
   --ds-base-5: #2e2e33;
 
-  /* ── Borders ──────────────────────────────────────────────────
-     Opacity-based whites adapt to any background automatically.  */
+  /* ── Borders ─────────────────────────────────────────────── */
   --ds-border-subtle:   rgba(255, 255, 255, 0.06);
   --ds-border-moderate: rgba(255, 255, 255, 0.10);
   --ds-border-strong:   rgba(255, 255, 255, 0.18);
   --ds-border-accent:   rgba(37, 99, 235, 0.50);
 
-  /* ── Text hierarchy ───────────────────────────────────────────
-     Four levels: primary / secondary / tertiary / code          */
+  /* ── Text ─────────────────────────────────────────────────── */
   --ds-text-1:    #ededef;
   --ds-text-2:    #9494a0;
   --ds-text-3:    #5e5e6a;
   --ds-text-code: #e4e4e7;
 
-  /* ── Brand accent — Deep Electric Blue ───────────────────────
-     Single accent color. Used for buttons, links, active states,
-     focus rings, and chart-1. Never mixed with other hues.       */
+  /* ── Brand accent ─────────────────────────────────────────── */
   --ds-accent:        #2563eb;
   --ds-accent-hover:  #3b82f6;
   --ds-accent-muted:  rgba(37, 99, 235, 0.12);
@@ -142,48 +257,15 @@
   --ds-info-muted:     rgba(96, 165, 250, 0.10);
   --ds-info-border:    rgba(96, 165, 250, 0.25);
 
-  /* ── Shadows ──────────────────────────────────────────────────
-     Double box-shadow pattern: drop shadow + 1px border overlay.
-     The overlay creates a crisp edge without border box-model.   */
+  /* ── Shadows — dark mode: darker drops + white ring overlay ─ */
   --ds-shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.40);
-  --ds-shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.40),
-                     0 0 0 1px rgba(255, 255, 255, 0.06);
-  --ds-shadow-md:    0 4px 8px rgba(0, 0, 0, 0.50),
-                     0 0 0 1px rgba(255, 255, 255, 0.08);
-  --ds-shadow-lg:    0 8px 24px rgba(0, 0, 0, 0.60),
-                     0 0 0 1px rgba(255, 255, 255, 0.10);
-  --ds-shadow-xl:    0 16px 48px rgba(0, 0, 0, 0.70),
-                     0 0 0 1px rgba(255, 255, 255, 0.12);
+  --ds-shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --ds-shadow-md:    0 4px 8px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --ds-shadow-lg:    0 8px 24px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.10);
+  --ds-shadow-xl:    0 16px 48px rgba(0, 0, 0, 0.70), 0 0 0 1px rgba(255, 255, 255, 0.12);
   --ds-shadow-focus: 0 0 0 3px rgba(37, 99, 235, 0.35);
 
-  /* ── Border radius ───────────────────────────────────────────
-     sm: chips/badges  md: buttons/inputs  lg: cards
-     xl: dialogs       2xl: large panels   full: pills/dots      */
-  --ds-radius-none: 0px;
-  --ds-radius-sm:   4px;
-  --ds-radius-md:   6px;
-  --ds-radius-lg:   8px;
-  --ds-radius-xl:   12px;
-  --ds-radius-2xl:  16px;
-  --ds-radius-full: 9999px;
-
-  /* ── Motion — durations ──────────────────────────────────────
-     Exits are always shorter than enters (user triggered them). */
-  --ds-duration-instant: 0ms;
-  --ds-duration-fast:    100ms;
-  --ds-duration-base:    180ms;
-  --ds-duration-slow:    260ms;
-  --ds-duration-enter:   220ms;
-  --ds-duration-exit:    160ms;
-
-  /* ── Motion — easings ─────────────────────────────────────── */
-  --ds-ease-out:    cubic-bezier(0, 0, 0.2, 1);
-  --ds-ease-in:     cubic-bezier(0.4, 0, 1, 1);
-  --ds-ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --ds-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-
-  /* ── shadcn/ui tokens — mapped to design system ──────────────
-     Keeps shadcn primitives functional without modification.     */
+  /* ── shadcn/ui tokens ────────────────────────────────────── */
   --background:           var(--ds-base-0);
   --foreground:           var(--ds-text-1);
   --card:                 var(--ds-base-1);
@@ -203,56 +285,13 @@
   --input:                var(--ds-border-moderate);
   --ring:                 var(--ds-accent);
 
-  /* Charts — chart-1 always mirrors the accent */
-  --chart-1: #2563eb;
+  --chart-1: #3b82f6;
   --chart-2: #22c55e;
   --chart-3: #f59e0b;
   --chart-4: #f87171;
-  --chart-5: #60a5fa;
-  --chart-6: #e879f9;
+  --chart-5: #a78bfa;
+  --chart-6: #34d399;
 
-  /* Sidebar */
-  --sidebar:                         var(--ds-base-1);
-  --sidebar-foreground:              var(--ds-text-1);
-  --sidebar-primary:                 var(--ds-accent);
-  --sidebar-primary-foreground:      #ffffff;
-  --sidebar-accent:                  var(--ds-base-3);
-  --sidebar-accent-foreground:       var(--ds-text-1);
-  --sidebar-border:                  var(--ds-border-subtle);
-  --sidebar-ring:                    var(--ds-accent);
-
-  /* Radius base for shadcn compat (8px = --ds-radius-lg) */
-  --radius: 0.5rem;
-}
-
-/* Dark class mirrors :root — this is a dark-only application.
-   Required because shadcn components emit dark: utility variants
-   and ThemeProvider adds .dark to <html>.                        */
-.dark {
-  --background:           var(--ds-base-0);
-  --foreground:           var(--ds-text-1);
-  --card:                 var(--ds-base-1);
-  --card-foreground:      var(--ds-text-1);
-  --popover:              var(--ds-base-2);
-  --popover-foreground:   var(--ds-text-1);
-  --primary:              var(--ds-accent);
-  --primary-foreground:   #ffffff;
-  --secondary:            var(--ds-base-3);
-  --secondary-foreground: var(--ds-text-1);
-  --muted:                var(--ds-base-3);
-  --muted-foreground:     var(--ds-text-2);
-  --accent:               var(--ds-base-3);
-  --accent-foreground:    var(--ds-text-1);
-  --destructive:          var(--ds-error);
-  --border:               var(--ds-border-subtle);
-  --input:                var(--ds-border-moderate);
-  --ring:                 var(--ds-accent);
-  --chart-1: #2563eb;
-  --chart-2: #22c55e;
-  --chart-3: #f59e0b;
-  --chart-4: #f87171;
-  --chart-5: #60a5fa;
-  --chart-6: #e879f9;
   --sidebar:                    var(--ds-base-1);
   --sidebar-foreground:         var(--ds-text-1);
   --sidebar-primary:            var(--ds-accent);
@@ -287,15 +326,21 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SQL syntax highlighting
+   SQL syntax highlighting — light mode defaults
    ═══════════════════════════════════════════════════════════════ */
-.sql-keyword  { color: #93c5fd; font-weight: 600; }
-.sql-function { color: #22c55e; }
-.sql-string   { color: #f87171; }
-.sql-number   { color: #60a5fa; }
-.sql-operator { color: var(--ds-text-2); }
+.sql-keyword    { color: #1d4ed8; font-weight: 600; }
+.sql-function   { color: #15803d; }
+.sql-string     { color: #dc2626; }
+.sql-number     { color: #2563eb; }
+.sql-operator   { color: var(--ds-text-2); }
 .sql-comment    { color: var(--ds-text-3); font-style: italic; }
 .sql-identifier { color: var(--ds-text-2); }
+
+/* Dark mode overrides */
+.dark .sql-keyword  { color: #93c5fd; }
+.dark .sql-function { color: #22c55e; }
+.dark .sql-string   { color: #f87171; }
+.dark .sql-number   { color: #60a5fa; }
 
 /* ═══════════════════════════════════════════════════════════════
    Code line numbers
@@ -332,7 +377,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Indeterminate progress bar — used during AI query generation
+   Indeterminate progress bar
    ═══════════════════════════════════════════════════════════════ */
 @keyframes progress-slide {
   0%   { transform: translateX(-100%); }
@@ -388,8 +433,8 @@
 }
 
 @keyframes voice-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.4); }
-  50%       { box-shadow: 0 0 0 8px rgba(248, 113, 113, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
 }
 
 .voice-waveform {
@@ -408,38 +453,12 @@
 /* ═══════════════════════════════════════════════════════════════
    Scrollbars
    ═══════════════════════════════════════════════════════════════ */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--ds-base-4); border-radius: var(--ds-radius-full); }
+::-webkit-scrollbar-thumb:hover { background: var(--ds-base-5); }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--ds-base-4);
-  border-radius: var(--ds-radius-full);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--ds-base-5);
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--ds-base-4);
-  border-radius: var(--ds-radius-full);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--ds-base-5);
-}
+.custom-scrollbar::-webkit-scrollbar        { width: 5px; height: 5px; }
+.custom-scrollbar::-webkit-scrollbar-track  { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb  { background: var(--ds-base-4); border-radius: var(--ds-radius-full); }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--ds-base-5); }
