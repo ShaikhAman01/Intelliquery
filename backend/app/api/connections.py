@@ -7,7 +7,7 @@ from datetime import datetime
 from app.api.deps import get_db
 from app.models.core import DbConnection, User
 from app.middleware.auth import get_current_user, require_viewer, require_editor, require_admin
-from app.core.security import encrypt_password
+from app.core.security import encrypt_password, decrypt_password
 from app.pipeline.schema_mapper import SchemaMapper
 from app.core.client_db_manager import ClientDBManager
 from app.core.logger import logger
@@ -94,6 +94,33 @@ def test_connection(
 
     except Exception as e:
         logger.error(f"Connection test failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
+
+
+@router.post("/{connection_id}/test")
+def test_saved_connection(
+    connection_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_viewer),
+):
+    """Test an existing saved connection by ID (no password needed from client)."""
+    conn = db.query(DbConnection).filter(DbConnection.id == connection_id).first()
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found.")
+    if conn.user_id != current_user.id:
+        if not conn.org_id or conn.org_id != current_user.org_id:
+            raise HTTPException(status_code=403, detail="Access denied.")
+    try:
+        from sqlalchemy import create_engine, text
+        password = decrypt_password(conn.encrypted_password)
+        db_url = _build_db_url(conn.db_type, conn.username, password, conn.host, conn.port, conn.db_name, conn.use_ssl)
+        engine = create_engine(db_url, connect_args={"connect_timeout": 10})
+        with engine.connect() as c:
+            c.execute(text("SELECT 1"))
+        engine.dispose()
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Connection test failed for id={connection_id}: {e}")
         raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
 
 

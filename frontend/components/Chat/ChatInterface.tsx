@@ -8,7 +8,7 @@ import {
   KeyboardEvent,
 } from 'react';
 import { useStore } from '@/lib/store';
-import { sendQuery } from '@/lib/api';
+import { sendQuery, executeSQL, getSchema } from '@/lib/api';
 import { useToast } from '@/components/ui/toaster';
 import { ResultsTable } from '@/components/Chat/ResultsTable';
 import { InsightsView } from '@/components/Chat/InsightsView';
@@ -27,7 +27,9 @@ import {
   TrendingUp,
   AlertTriangle,
   X,
-  PlusCircle
+  PlusCircle,
+  Pencil,
+  RotateCcw,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
@@ -52,6 +54,9 @@ interface ChatMessage {
   saveOpen: boolean;
   snippetTitle: string;
   copied: boolean;
+  sqlEditing: boolean;
+  editedSql: string;
+  isRunningEdit: boolean;
 }
 
 /* ── Thinking dots ──────────────────────────────────────────── */
@@ -112,15 +117,38 @@ interface MessageProps {
   connectionId: number | null;
 }
 
-function Message({ msg, onUpdate, onSaveSnippet }: MessageProps) {
+function Message({ msg, onUpdate, onSaveSnippet, connectionId }: MessageProps) {
   const { toast } = useToast();
 
+  const displaySql = msg.editedSql || msg.sql || '';
+  const isModified = !!msg.editedSql && msg.editedSql !== msg.sql;
+
   const handleCopy = async () => {
-    if (!msg.sql) return;
-    await navigator.clipboard.writeText(msg.sql);
+    if (!displaySql) return;
+    await navigator.clipboard.writeText(displaySql);
     onUpdate(msg.id, { copied: true });
     toast('SQL copied to clipboard', 'success');
     setTimeout(() => onUpdate(msg.id, { copied: false }), 2000);
+  };
+
+  const handleRunEdited = async () => {
+    if (!connectionId || !displaySql) return;
+    onUpdate(msg.id, { isRunningEdit: true });
+    try {
+      const result = await executeSQL(displaySql, connectionId);
+      onUpdate(msg.id, {
+        data: result.data,
+        executionTime: result.execution_time_ms,
+        runExpanded: true,
+        insightsExpanded: false,
+        sqlEditing: false,
+        isRunningEdit: false,
+      });
+    } catch (err: unknown) {
+      const detail = (err as any)?.response?.data?.detail ?? 'Execution failed.';
+      toast(detail, 'error');
+      onUpdate(msg.id, { isRunningEdit: false });
+    }
   };
 
   return (
@@ -188,33 +216,93 @@ function Message({ msg, onUpdate, onSaveSnippet }: MessageProps) {
                 className="rounded-xl overflow-hidden"
                 style={{
                   background: 'var(--ds-base-1)',
-                  border: '1px solid var(--ds-border-subtle)',
+                  border: `1px solid ${msg.sqlEditing ? 'var(--ds-border-accent)' : 'var(--ds-border-subtle)'}`,
                 }}
               >
+                {/* SQL header */}
                 <div
-                  className="flex items-center justify-between px-4 py-2 border-b border-border"
+                  className="flex items-center justify-between px-4 py-2 border-b border-border gap-2"
                   style={{ background: 'var(--ds-base-2)' }}
                 >
-                  <span className="text-[11px] font-mono font-semibold text-content-3 uppercase tracking-wider">
-                    SQL
-                  </span>
-                  <button
-                    onClick={handleCopy}
-                    className="h-6 flex items-center gap-1.5 px-2 rounded text-[11px] text-content-3 hover:text-content-1 hover:bg-base-3 transition-colors"
-                  >
-                    {msg.copied ? (
-                      <Check className="h-3 w-3 text-success" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono font-semibold text-content-3 uppercase tracking-wider">SQL</span>
+                    {isModified && !msg.sqlEditing && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{ background: 'var(--ds-warning-muted)', color: 'var(--ds-warning)' }}>
+                        modified
+                      </span>
                     )}
-                    {msg.copied ? 'Copied' : 'Copy'}
-                  </button>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {msg.sqlEditing ? (
+                      <>
+                        <button
+                          onClick={() => onUpdate(msg.id, { sqlEditing: false, editedSql: msg.sql ?? '' })}
+                          className="h-6 flex items-center gap-1.5 px-2 rounded text-[11px] text-content-3 hover:text-content-1 hover:bg-base-3 transition-colors"
+                        >
+                          <X className="h-3 w-3" /> Cancel
+                        </button>
+                        <button
+                          onClick={handleRunEdited}
+                          disabled={msg.isRunningEdit}
+                          className="h-6 flex items-center gap-1.5 px-2 rounded text-[11px] font-medium text-white transition-colors disabled:opacity-60"
+                          style={{ background: 'var(--ds-accent)' }}
+                        >
+                          {msg.isRunningEdit
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <Play className="h-3 w-3" />}
+                          Run
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {isModified && (
+                          <button
+                            onClick={() => onUpdate(msg.id, { editedSql: '', sqlEditing: false })}
+                            className="h-6 flex items-center gap-1.5 px-2 rounded text-[11px] text-content-3 hover:text-content-1 hover:bg-base-3 transition-colors"
+                          >
+                            <RotateCcw className="h-3 w-3" /> Reset
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onUpdate(msg.id, { sqlEditing: true, editedSql: displaySql })}
+                          className="h-6 flex items-center gap-1.5 px-2 rounded text-[11px] text-content-3 hover:text-content-1 hover:bg-base-3 transition-colors"
+                        >
+                          <Pencil className="h-3 w-3" /> Edit
+                        </button>
+                        <button
+                          onClick={handleCopy}
+                          className="h-6 flex items-center gap-1.5 px-2 rounded text-[11px] text-content-3 hover:text-content-1 hover:bg-base-3 transition-colors"
+                        >
+                          {msg.copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
+                          {msg.copied ? 'Copied' : 'Copy'}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <pre className="px-4 py-3 overflow-x-auto custom-scrollbar">
-                  <code className="font-mono text-[12px] text-content-code">
-                    {highlightSQL(msg.sql)}
-                  </code>
-                </pre>
+
+                {/* SQL body — editable textarea or syntax-highlighted read-only */}
+                {msg.sqlEditing ? (
+                  <textarea
+                    autoFocus
+                    value={msg.editedSql}
+                    onChange={(e) => onUpdate(msg.id, { editedSql: e.target.value })}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); handleRunEdited(); }
+                      if (e.key === 'Escape') onUpdate(msg.id, { sqlEditing: false, editedSql: msg.sql ?? '' });
+                    }}
+                    className="w-full px-4 py-3 font-mono text-[12px] bg-transparent text-content-1 outline-none resize-none custom-scrollbar"
+                    style={{ minHeight: 100 }}
+                    rows={Math.max(4, (msg.editedSql || '').split('\n').length + 1)}
+                  />
+                ) : (
+                  <pre className="px-4 py-3 overflow-x-auto custom-scrollbar">
+                    <code className="font-mono text-[12px] text-content-code">
+                      {highlightSQL(displaySql)}
+                    </code>
+                  </pre>
+                )}
               </div>
 
               {/* Action row */}
@@ -359,18 +447,65 @@ function Message({ msg, onUpdate, onSaveSnippet }: MessageProps) {
 
 /* ── Welcome screen ─────────────────────────────────────────── */
 
-const SUGGESTIONS = [
+type Suggestion = { label: string; icon: React.ElementType };
+
+const FALLBACK_SUGGESTIONS: Suggestion[] = [
   { label: 'Show top 10 customers by revenue', icon: TrendingUp },
   { label: 'Find anomalies in the transactions', icon: AlertTriangle },
   { label: 'Compare sales across regions this month', icon: Zap },
 ];
 
+const TABLE_TEMPLATES: Array<{
+  keywords: string[];
+  template: (t: string) => string;
+  icon: React.ElementType;
+}> = [
+  { keywords: ['order', 'sale', 'purchase'], template: t => `Show top 10 ${t} by total amount`, icon: TrendingUp },
+  { keywords: ['customer', 'user', 'client', 'member'], template: t => `Find most active ${t}s this month`, icon: Zap },
+  { keywords: ['product', 'item', 'inventory', 'stock'], template: t => `List ${t}s with the lowest stock`, icon: AlertTriangle },
+  { keywords: ['payment', 'invoice', 'billing', 'transaction'], template: t => `Find pending ${t}s from the last 30 days`, icon: TrendingUp },
+  { keywords: ['log', 'event', 'activity', 'audit'], template: t => `Show recent ${t} entries`, icon: Zap },
+  { keywords: ['employee', 'staff', 'team'], template: t => `List ${t}s grouped by department`, icon: Zap },
+  { keywords: ['category', 'tag', 'type', 'status'], template: t => `Count records grouped by ${t}`, icon: TrendingUp },
+  { keywords: ['report', 'metric', 'stat', 'analytic'], template: t => `Summarize ${t} for this quarter`, icon: TrendingUp },
+];
+
+function getSuggestionsFromTables(tableNames: string[]) {
+  const used = new Set<string>();
+  const result: Array<{ label: string; icon: React.ElementType }> = [];
+
+  for (const tpl of TABLE_TEMPLATES) {
+    if (result.length >= 3) break;
+    for (const table of tableNames) {
+      if (used.has(table)) continue;
+      if (tpl.keywords.some(k => table.toLowerCase().includes(k))) {
+        result.push({ label: tpl.template(table), icon: tpl.icon });
+        used.add(table);
+        break;
+      }
+    }
+  }
+
+  const icons = [TrendingUp, Zap, AlertTriangle];
+  for (const table of tableNames) {
+    if (result.length >= 3) break;
+    if (!used.has(table)) {
+      result.push({ label: `Show top records from ${table}`, icon: icons[result.length % 3] });
+      used.add(table);
+    }
+  }
+
+  return result.length > 0 ? result : FALLBACK_SUGGESTIONS;
+}
+
 function WelcomeScreen({
   onSelect,
   hasConnection,
+  suggestions,
 }: {
   onSelect: (text: string) => void;
   hasConnection: boolean;
+  suggestions: Suggestion[];
 }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-10 px-4 text-center">
@@ -408,7 +543,7 @@ function WelcomeScreen({
         </div>
       ) : (
         <div className="flex flex-col gap-3 w-full max-w-xl">
-          {SUGGESTIONS.map(({ label, icon: Icon }) => (
+          {suggestions.map(({ label, icon: Icon }) => (
             <button
               key={label}
               onClick={() => onSelect(label)}
@@ -427,7 +562,23 @@ function WelcomeScreen({
 
 /* ── Main ChatInterface ─────────────────────────────────────── */
 
-export function ChatInterface() {
+interface RestoreSession {
+  id: string;
+  connectionId: number;
+  queries: Array<{ question: string; sql: string }>;
+}
+
+interface ChatInterfaceProps {
+  pendingReplay?: string | null;
+  onReplayConsumed?: () => void;
+  onQueryComplete?: (question: string, sql: string, connectionId: number) => void;
+  pendingReplayCached?: { question: string; sql: string } | null;
+  onReplayCachedConsumed?: () => void;
+  pendingRestore?: RestoreSession | null;
+  onRestoreConsumed?: () => void;
+}
+
+export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete, pendingReplayCached, onReplayCachedConsumed, pendingRestore, onRestoreConsumed }: ChatInterfaceProps = {}) {
   const { connections, activeConnectionId, setActiveConnection } = useStore();
   const { toast } = useToast();
 
@@ -435,12 +586,24 @@ export function ChatInterface() {
   const [input, setInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [connectionSelectorOpen, setConnectionSelectorOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>(FALLBACK_SUGGESTIONS);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const connSelectorRef = useRef<HTMLDivElement>(null);
 
   const activeConnection = connections.find((c) => c.id === activeConnectionId);
+
+  /* Rebuild suggestions whenever the active connection changes */
+  useEffect(() => {
+    if (!activeConnectionId) { setSuggestions(FALLBACK_SUGGESTIONS); return; }
+    getSchema(activeConnectionId)
+      .then((res) => {
+        const tables = Object.keys(res.tables || res);
+        setSuggestions(getSuggestionsFromTables(tables));
+      })
+      .catch(() => setSuggestions(FALLBACK_SUGGESTIONS));
+  }, [activeConnectionId]);
 
   /* Auto-resize textarea */
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -492,9 +655,9 @@ export function ChatInterface() {
     [messages, activeConnectionId, toast, updateMessage]
   );
 
-  /* Submit */
-  const handleSubmit = useCallback(async () => {
-    const query = input.trim();
+  /* Submit — accepts an optional direct query string (used by replay) */
+  const handleSubmit = useCallback(async (overrideQuery?: string) => {
+    const query = (typeof overrideQuery === 'string' ? overrideQuery : input).trim();
     if (!query || isSubmitting) return;
     if (!activeConnectionId) {
       toast('Select a database connection first.', 'error');
@@ -513,18 +676,23 @@ export function ChatInterface() {
         saveOpen: false,
         snippetTitle: '',
         copied: false,
+        sqlEditing: false,
+        editedSql: '',
+        isRunningEdit: false,
       },
     ]);
-    setInput('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+    if (typeof overrideQuery !== 'string') {
+      setInput('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
     }
     setIsSubmitting(true);
+    let successSql: string | undefined;
 
     try {
       const result = await sendQuery(query, activeConnectionId);
+      successSql = result.sql || '';
       updateMessage(id, {
-        sql: result.sql || '',
+        sql: successSql,
         explanation: result.explanation || '',
         data: result.data || [],
         chartRec: result.chart_recommendation,
@@ -543,11 +711,110 @@ export function ChatInterface() {
       updateMessage(id, { status: 'error', errorMessage: detail });
     } finally {
       setIsSubmitting(false);
+      if (successSql !== undefined) onQueryComplete?.(query, successSql, activeConnectionId);
     }
-  }, [input, isSubmitting, activeConnectionId, toast, updateMessage]);
+  }, [input, isSubmitting, activeConnectionId, toast, updateMessage, onQueryComplete]);
+
+  /* Stable ref so the pendingReplay effect always calls the latest handleSubmit */
+  const handleSubmitRef = useRef(handleSubmit);
+  useEffect(() => { handleSubmitRef.current = handleSubmit; }, [handleSubmit]);
+
+  /* Track which replay we've already fired so StrictMode double-invoke doesn't duplicate */
+  const lastReplayedRef = useRef<string | null>(null);
+
+  /* Auto-submit when a replay is injected from another view */
+  useEffect(() => {
+    if (!pendingReplay || lastReplayedRef.current === pendingReplay) return;
+    lastReplayedRef.current = pendingReplay;
+    handleSubmitRef.current(pendingReplay);
+    onReplayConsumed?.();
+  }, [pendingReplay, onReplayConsumed]);
+
+  /* Fast cached replay — executes stored SQL directly, skips AI */
+  const handleSubmitCached = useCallback(async (question: string, sql: string) => {
+    if (!activeConnectionId || isSubmitting) return;
+    const id = `msg-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { id, userQuery: question, status: 'thinking', runExpanded: false, insightsExpanded: false, saveOpen: false, snippetTitle: '', copied: false, sqlEditing: false, editedSql: '', isRunningEdit: false },
+    ]);
+    setIsSubmitting(true);
+    let succeeded = false;
+    try {
+      const result = await executeSQL(sql, activeConnectionId);
+      updateMessage(id, { sql, data: result.data || [], executionTime: result.execution_time_ms, status: 'ready' });
+      succeeded = true;
+    } catch (err: unknown) {
+      let detail = 'SQL execution failed.';
+      if (typeof err === 'object' && err !== null) {
+        const e = err as Record<string, unknown>;
+        const res = e.response as Record<string, unknown> | undefined;
+        const resData = res?.data as Record<string, unknown> | undefined;
+        if (typeof resData?.detail === 'string') detail = resData.detail;
+      }
+      updateMessage(id, { status: 'error', errorMessage: detail });
+    } finally {
+      setIsSubmitting(false);
+      if (succeeded) onQueryComplete?.(question, sql, activeConnectionId);
+    }
+  }, [activeConnectionId, isSubmitting, updateMessage, onQueryComplete]);
+
+  const handleSubmitCachedRef = useRef(handleSubmitCached);
+  useEffect(() => { handleSubmitCachedRef.current = handleSubmitCached; }, [handleSubmitCached]);
+
+  const lastReplayedCachedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingReplayCached) return;
+    const key = `${pendingReplayCached.question}::${pendingReplayCached.sql}`;
+    if (lastReplayedCachedRef.current === key) return;
+    lastReplayedCachedRef.current = key;
+    handleSubmitCachedRef.current(pendingReplayCached.question, pendingReplayCached.sql);
+    onReplayCachedConsumed?.();
+  }, [pendingReplayCached, onReplayCachedConsumed]);
+
+  /* Session restore — rebuild full conversation by executing all queries in parallel */
+  const lastRestoredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingRestore || !activeConnectionId) return;
+    if (lastRestoredRef.current === pendingRestore.id) return;
+    lastRestoredRef.current = pendingRestore.id;
+
+    if (pendingRestore.connectionId && pendingRestore.connectionId !== activeConnectionId) {
+      setActiveConnection(pendingRestore.connectionId);
+    }
+
+    const connId = pendingRestore.connectionId || activeConnectionId;
+    const initialMsgs: ChatMessage[] = pendingRestore.queries.map((q, i) => ({
+      id: `restore-${pendingRestore.id}-${i}`,
+      userQuery: q.question,
+      sql: q.sql,
+      status: 'thinking' as const,
+      runExpanded: false,
+      insightsExpanded: false,
+      saveOpen: false,
+      snippetTitle: '',
+      copied: false,
+      sqlEditing: false,
+      editedSql: '',
+      isRunningEdit: false,
+    }));
+    setMessages(initialMsgs);
+
+    Promise.all(
+      initialMsgs.map(async (msg, i) => {
+        const q = pendingRestore.queries[i];
+        try {
+          const result = await executeSQL(q.sql, connId);
+          updateMessage(msg.id, { data: result.data || [], executionTime: result.execution_time_ms, status: 'ready' });
+        } catch {
+          updateMessage(msg.id, { status: 'error', errorMessage: 'Query failed.' });
+        }
+      })
+    ).finally(() => onRestoreConsumed?.());
+  }, [pendingRestore, activeConnectionId, setActiveConnection, updateMessage, onRestoreConsumed]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
       e.preventDefault();
       handleSubmit();
     }
@@ -569,7 +836,7 @@ export function ChatInterface() {
 
           {messages.length === 0 ? (
             <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 280px)' }}>
-              <WelcomeScreen onSelect={handleSuggestion} hasConnection={hasConnection} />
+              <WelcomeScreen onSelect={handleSuggestion} hasConnection={hasConnection} suggestions={suggestions} />
             </div>
           ) : (
             <div className="space-y-8">
@@ -692,7 +959,7 @@ export function ChatInterface() {
             />
             <button
               type="button"
-              onClick={handleSubmit}
+              onClick={() => handleSubmit()}
               disabled={!input.trim() || !activeConnectionId || isSubmitting}
               className={[
                 'h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-[background-color,opacity] duration-[100ms]',
@@ -716,7 +983,7 @@ export function ChatInterface() {
           </div>
 
           <p className="text-center text-[13px] text-content-3">
-            <kbd className="font-mono">Enter</kbd> to send · <kbd className="font-mono">Shift+Enter</kbd> for new line
+            <kbd className="font-mono">Enter</kbd> to send &nbsp;·&nbsp; <kbd className="font-mono">Shift+Enter</kbd> for new line
           </p>
         </div>
       </div>

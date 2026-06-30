@@ -26,6 +26,11 @@ export const testConnection = async (data: Record<string, unknown>) => {
   return res.data;
 };
 
+export const testConnectionById = async (id: number) => {
+  const res = await api.post(`/connections/${id}/test`);
+  return res.data;
+};
+
 export const deleteConnection = async (id: number) => {
   const res = await api.delete(`/connections/${id}`);
   return res.data;
@@ -41,6 +46,13 @@ export const toggleConnectionStatus = async (id: number, isActive: boolean) => {
 export const sendQuery = async (query: string, connectionId: number) => {
   const res = await api.post('/query/generate', null, {
     params: { user_query: query, connection_id: connectionId },
+  });
+  return res.data;
+};
+
+export const executeSQL = async (sql: string, connectionId: number) => {
+  const res = await api.post('/query/execute', null, {
+    params: { sql, connection_id: connectionId },
   });
   return res.data;
 };

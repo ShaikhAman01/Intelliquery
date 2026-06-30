@@ -8,6 +8,7 @@ import { ChatInterface } from "@/components/Chat/ChatInterface";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useStore } from "@/lib/store";
 import { getSchema, getHistory, getSnippets, deleteHistory } from "@/lib/api";
+import { type Session, getSessions, getSession, upsertSession, createSessionId } from "@/lib/sessions";
 import { useToast } from "@/components/ui/toaster";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
   FileSearch,
   Copy,
   ChevronDown,
+  RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -54,6 +56,63 @@ type View = "chat" | "schema" | "snippets" | "history";
 function AppShell() {
   const [activeView, setActiveView] = useState<View>("chat");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [pendingReplay, setPendingReplay] = useState<string | null>(null);
+  const [pendingReplayCached, setPendingReplayCached] = useState<{ question: string; sql: string } | null>(null);
+  const [chatKey, setChatKey] = useState(0);
+  const [recentsKey, setRecentsKey] = useState(0);
+
+  /* ── Session management ──────────────────────────────────── */
+  const [currentSessionId, setCurrentSessionId] = useState('');
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [pendingRestore, setPendingRestore] = useState<Session | null>(null);
+
+  useEffect(() => {
+    setCurrentSessionId(createSessionId());
+    setSessions(getSessions());
+  }, []);
+
+  const refreshSessions = useCallback(() => setSessions(getSessions()), []);
+
+  const handleQueryComplete = useCallback((question: string, sql: string, connectionId: number) => {
+    if (!currentSessionId) return;
+    const existing = getSession(currentSessionId);
+    const updated: Session = existing
+      ? { ...existing, queries: [...existing.queries, { question, sql, timestamp: Date.now() }], updatedAt: Date.now() }
+      : { id: currentSessionId, title: question, connectionId, queries: [{ question, sql, timestamp: Date.now() }], updatedAt: Date.now() };
+    upsertSession(updated);
+    refreshSessions();
+  }, [currentSessionId, refreshSessions]);
+
+  const handleRestoreSession = useCallback((sessionId: string) => {
+    const session = getSession(sessionId);
+    if (!session) return;
+    setCurrentSessionId(session.id);
+    setPendingRestore(session);
+    setChatKey((k) => k + 1);
+    setPendingReplay(null);
+    setPendingReplayCached(null);
+    setActiveView("chat");
+  }, []);
+
+  const handleReplay = (question: string) => {
+    setPendingReplay(question);
+    setActiveView("chat");
+  };
+
+  const handleReplayCached = (question: string, sql: string) => {
+    setPendingReplayCached({ question, sql });
+    setActiveView("chat");
+  };
+
+  const handleNewChat = () => {
+    setCurrentSessionId(createSessionId());
+    setPendingRestore(null);
+    setChatKey((k) => k + 1);
+    setPendingReplay(null);
+    setPendingReplayCached(null);
+    setActiveView("chat");
+    setRecentsKey((k) => k + 1);
+  };
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-base-0">
@@ -62,14 +121,29 @@ function AppShell() {
         onViewChange={setActiveView}
         collapsed={!sidebarOpen}
         onToggle={() => setSidebarOpen((o) => !o)}
+        onNewChat={handleNewChat}
+        sessions={sessions}
+        onRestoreSession={handleRestoreSession}
+        activeSessionId={currentSessionId}
       />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header activeView={activeView} onViewChange={setActiveView} />
         <main className="relative flex-1 min-h-0 overflow-hidden">
-          {activeView === "chat"     && <ChatInterface />}
+          {activeView === "chat"     && (
+            <ChatInterface
+              key={chatKey}
+              pendingReplay={pendingReplay}
+              onReplayConsumed={() => setPendingReplay(null)}
+              pendingReplayCached={pendingReplayCached}
+              onReplayCachedConsumed={() => setPendingReplayCached(null)}
+              pendingRestore={pendingRestore}
+              onRestoreConsumed={() => setPendingRestore(null)}
+              onQueryComplete={handleQueryComplete}
+            />
+          )}
           {activeView === "schema"   && <SchemaView />}
-          {activeView === "snippets" && <SavedQueriesView />}
-          {activeView === "history"  && <HistoryView />}
+          {activeView === "snippets" && <SavedQueriesView onReplay={handleReplay} />}
+          {activeView === "history"  && <HistoryView onReplay={handleReplay} />}
         </main>
       </div>
     </div>
@@ -289,7 +363,7 @@ function SchemaView() {
 
 /* ── Saved Queries ────────────────────────────────────────── */
 
-function SavedQueriesView() {
+function SavedQueriesView({ onReplay }: { onReplay: (q: string) => void }) {
   const { activeConnectionId } = useStore();
   const { toast } = useToast();
   const [snippets, setSnippets] = useState<any[]>([]);
@@ -376,7 +450,11 @@ function SavedQueriesView() {
                       <Copy className="h-3 w-3" />
                       Copy SQL
                     </Button>
-                    <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-[11px]">
+                    <Button
+                      variant="outline" size="sm"
+                      onClick={() => onReplay(snippet.title)}
+                      className="h-7 gap-1.5 px-2.5 text-[11px]"
+                    >
                       <Play className="h-3 w-3" />
                       Run
                     </Button>
@@ -412,7 +490,7 @@ function relativeTime(ts: string): string {
   return new Date(ts).toLocaleDateString();
 }
 
-function HistoryView() {
+function HistoryView({ onReplay }: { onReplay: (q: string) => void }) {
   const { activeConnectionId } = useStore();
   const { toast } = useToast();
   const [entries, setEntries] = useState<any[]>([]);
@@ -495,7 +573,7 @@ function HistoryView() {
         ) : (
           <div className="space-y-2">
             {filtered.map((entry: any) => {
-              const isSuccess = entry.execution_status === "success";
+              const isSuccess = entry.execution_status?.toUpperCase() === "SUCCESS";
               const isExpanded = expandedId === entry.id;
               return (
                 <div
@@ -572,6 +650,16 @@ function HistoryView() {
                           >
                             <Copy className="h-3 w-3" />
                             Copy SQL
+                          </Button>
+                        )}
+                        {entry.user_question && (
+                          <Button
+                            variant="outline" size="sm"
+                            onClick={(e) => { e.stopPropagation(); onReplay(entry.user_question); }}
+                            className="h-7 gap-1.5 px-2.5 text-[11px]"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            Replay
                           </Button>
                         )}
                         <Button

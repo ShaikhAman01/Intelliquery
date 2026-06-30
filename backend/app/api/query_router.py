@@ -225,6 +225,49 @@ async def process_query(
     }
 
 
+@router.post("/execute", status_code=status.HTTP_200_OK)
+async def execute_raw_sql(
+    sql: str,
+    connection_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_viewer),
+):
+    """Execute a raw SQL statement directly, bypassing AI generation."""
+    connection = db.query(DbConnection).filter(DbConnection.id == connection_id).first()
+    if not connection:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found.")
+
+    if connection.user_id != current_user.id:
+        if not connection.org_id or connection.org_id != current_user.org_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this connection.")
+
+    start_time = time.time()
+    try:
+        data = await executor.run_query(sql, connection)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    execution_time_ms = int((time.time() - start_time) * 1000)
+
+    history_entry = QueryHistory(
+        connection_id=connection.id,
+        user_id=current_user.id,
+        user_question="[Edited SQL]",
+        generated_sql=sql,
+        generation_source="USER_EDIT",
+        execution_status="SUCCESS",
+        execution_time_ms=execution_time_ms,
+        row_count=len(data) if data else 0,
+    )
+    try:
+        db.add(history_entry)
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    return {"data": data, "execution_time_ms": execution_time_ms}
+
+
 @router.post("/explain", status_code=status.HTTP_200_OK)
 async def explain_query(
     sql: str,

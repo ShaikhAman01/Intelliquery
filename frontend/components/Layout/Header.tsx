@@ -163,6 +163,7 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
             activeView={activeView}
             onViewChange={(v) => { onViewChange?.(v); }}
             collapsed={false}
+            alwaysVisible
           />
         </SheetContent>
       </Sheet>
@@ -175,7 +176,7 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
         <span className="text-sm font-semibold text-content-1 tracking-tight">Intelliquery</span>
       </div>
 
-      <div className="flex-1" />
+<div className="flex-1" />
 
       {/* Right side actions */}
       <div className="flex items-center gap-1">
