@@ -49,7 +49,7 @@ class OpenAIProvider:
 
     def generate_sql(self, messages: list, temperature: float = 0.1) -> str:
         response = self.client.chat.completions.create(
-            model="gpt-5.4-mini",
+            model=settings.OPENAI_MODEL,
             messages=messages,
             temperature=temperature,
         )
@@ -58,7 +58,7 @@ class OpenAIProvider:
 
     def generate_insights(self, messages: list, temperature: float = 0.5) -> str:
         response = self.client.chat.completions.create(
-            model="gpt-5.4-mini",
+            model=settings.OPENAI_MODEL,
             messages=messages,
             temperature=temperature,
         )
@@ -79,7 +79,7 @@ class GeminiProvider:
     def __init__(self):
         import google.generativeai as genai
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.client = genai.GenerativeModel("gemini-2.0-flash")
+        self.client = genai.GenerativeModel(settings.GEMINI_MODEL)
         self.name = "gemini"
 
     def generate_sql(self, messages: list, temperature: float = 0.1) -> str:

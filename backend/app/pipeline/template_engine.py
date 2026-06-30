@@ -57,9 +57,22 @@ class DynamicSQLGenerator:
         if not table_name:
             return None
 
-        columns_info = tables.get(table_name, [])
-        all_columns = [c["name"] for c in columns_info]
-        numeric_columns = [c["name"] for c in columns_info if self._is_numeric_type(c.get("type", ""))]
+        columns_info = tables.get(table_name, {})
+
+        # Schema is stored as {col_name: {type, is_pk, fk_target, nullable}}.
+        # Support the legacy list-of-dicts format too for safety.
+        if isinstance(columns_info, dict):
+            all_columns = list(columns_info.keys())
+            numeric_columns = [
+                name for name, meta in columns_info.items()
+                if isinstance(meta, dict) and self._is_numeric_type(meta.get("type", ""))
+            ]
+        else:
+            all_columns = [c["name"] for c in columns_info]
+            numeric_columns = [
+                c["name"] for c in columns_info
+                if self._is_numeric_type(c.get("type", ""))
+            ]
 
         # 2. Resolve base filters
         where_clauses = self._resolve_filters(entities, all_columns, nlp_data.get("filters", []))

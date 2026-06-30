@@ -1,6 +1,6 @@
 import time
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
@@ -11,6 +11,8 @@ from app.middleware.auth import get_current_user, require_viewer
 from app.pipeline.nlp_processor import NLPProcessor
 from app.pipeline.template_engine import DynamicSQLGenerator
 from app.pipeline.llm_fallback import LLMService
+from app.pipeline.schema_mapper import SchemaMapper
+from app.pipeline.schema_selector import select_relevant_tables
 from app.executor.sql_runner import SQLRunner
 from app.core.logger import logger
 
@@ -18,6 +20,7 @@ router = APIRouter()
 
 # Instantiate core execution services
 nlp = NLPProcessor()
+schema_mapper = SchemaMapper()
 dynamic_gen = DynamicSQLGenerator()
 llm = LLMService()
 executor = SQLRunner()
@@ -46,49 +49,6 @@ def _get_conversation_context(db: Session, user_id: str, connection_id: int, lim
         return []
 
 
-def _build_schema_context_string(cached_schema: Any) -> str:
-    """
-    Safely builds an explicit schema map prompt string for the LLM.
-    Handles both updated dictionary formats and legacy list formats.
-    """
-    if not cached_schema:
-        return ""
-        
-    schema_str_parts = []
-    
-    # Handle the upgraded high-performance dictionary layout
-    if isinstance(cached_schema, dict):
-        for table, columns_map in cached_schema.items():
-            col_details_list = []
-            for col_name, col_meta in columns_map.items():
-                # Extract structural parameters safely with fallback metrics
-                c_type = col_meta.get("type", "unknown") if isinstance(col_meta, dict) else str(col_meta)
-                c_pk = col_meta.get("is_pk", False) if isinstance(col_meta, dict) else False
-                c_fk = col_meta.get("fk_target", None) if isinstance(col_meta, dict) else None
-                
-                badges = []
-                if c_pk:
-                    badges.append("PK")
-                if c_fk:
-                    badges.append(f"FK -> {c_fk}")
-                    
-                badge_str = f" [{', '.join(badges)}]" if badges else ""
-                col_details_list.append(f'"{col_name}" ({c_type}{badge_str})')
-                
-            col_details = ", ".join(col_details_list)
-            schema_str_parts.append(f'Table "{table}": ({col_details})')
-            
-    # Fallback to handle old array-of-objects list formats seamlessly
-    elif isinstance(cached_schema, list):
-        for table_obj in cached_schema:
-            table = table_obj.get("name", "unknown")
-            cols = table_obj.get("columns", [])
-            col_details = ", ".join([f'"{c["name"]}" ({c.get("type", "unknown")})' for c in cols])
-            schema_str_parts.append(f'Table "{table}": ({col_details})')
-            
-    return "\n".join(schema_str_parts)
-
-
 @router.post("/generate", status_code=status.HTTP_200_OK)
 async def process_query(
     user_query: str,
@@ -109,9 +69,19 @@ async def process_query(
     if not connection.cached_schema:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Schema map empty. Please re-sync connection catalog.")
 
-    # ── 2. Parse Schema Context (Fixed for Dictionary Layout) ────────────────
-    schema_str = _build_schema_context_string(connection.cached_schema)
-    real_schema_map = {"tables": connection.cached_schema}
+    # ── 2. Schema selection + context building ────────────────────────────────
+    # Filter to only the tables relevant to this query before sending to LLM.
+    # The template engine always uses the full schema for table resolution;
+    # only the LLM prompt uses the filtered subset.
+    full_schema = connection.cached_schema
+    relevant_schema = select_relevant_tables(user_query, full_schema)
+    total_tables = len(full_schema)
+    selected_tables = len(relevant_schema)
+    if selected_tables < total_tables:
+        logger.info(f"Schema selection: {selected_tables}/{total_tables} tables selected for query.")
+
+    schema_str = schema_mapper.get_context_string(relevant_schema)
+    real_schema_map = {"tables": full_schema}  # template engine uses full schema for resolution
 
     # ── 3. Query Compilation ──────────────────────────────────────────────────
     nlp_result = nlp.process(user_query)
