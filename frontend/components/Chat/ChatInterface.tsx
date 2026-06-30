@@ -5,6 +5,7 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
   KeyboardEvent,
 } from 'react';
 import { useStore } from '@/lib/store';
@@ -30,6 +31,9 @@ import {
   PlusCircle,
   Pencil,
   RotateCcw,
+  BarChart3,
+  CheckCircle2,
+  ArrowRight,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
@@ -59,20 +63,48 @@ interface ChatMessage {
   isRunningEdit: boolean;
 }
 
-/* ── Thinking dots ──────────────────────────────────────────── */
+/* ── AI workflow stages ─────────────────────────────────────── */
 
-function ThinkingDots() {
+const WORKFLOW_STAGES = [
+  'Understanding your question',
+  'Analyzing database schema',
+  'Selecting relevant tables',
+  'Generating optimized SQL',
+  'Validating query',
+  'Executing query',
+  'Analyzing results',
+  'Generating AI insights',
+];
+
+function AIThinkingStages() {
+  const [stageIdx, setStageIdx] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setStageIdx((i) => Math.min(i + 1, WORKFLOW_STAGES.length - 1));
+    }, 1350);
+    return () => clearInterval(t);
+  }, []);
+
+  const label = WORKFLOW_STAGES[stageIdx];
+
   return (
-    <div className="flex items-center gap-1 py-1">
-      {[0, 1, 2].map((i) => (
-        <motion.div
-          key={i}
-          className="h-1.5 w-1.5 rounded-full"
-          style={{ background: 'var(--ds-accent)' }}
-          animate={{ opacity: [0.25, 1, 0.25], scale: [0.85, 1.1, 0.85] }}
-          transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18 }}
-        />
-      ))}
+    <div className="px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-2.5"
+      style={{ background: 'var(--ds-base-1)', border: '1px solid var(--ds-border-subtle)' }}
+    >
+      <Loader2 className="h-3.5 w-3.5 text-brand flex-shrink-0 animate-spin" />
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={stageIdx}
+          initial={{ opacity: 0, y: 3 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -3 }}
+          transition={{ duration: 0.15 }}
+          className="text-[13px] text-content-2"
+        >
+          {label}…
+        </motion.span>
+      </AnimatePresence>
     </div>
   );
 }
@@ -108,6 +140,146 @@ function highlightSQL(sql: string) {
   });
 }
 
+/* ── AI response card ───────────────────────────────────────── */
+
+function fmtNum(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+const CHART_LABELS: Record<string, string> = {
+  bar: 'Bar chart', line: 'Line chart', area: 'Area chart',
+  pie: 'Pie chart', kpi: 'KPI cards', table: 'Data table',
+};
+
+interface AIResponseCardProps {
+  explanation: string;
+  data: Record<string, unknown>[];
+  sql: string;
+  chartRec?: { chart_type: string; reason?: string };
+  onFollowUp?: (q: string) => void;
+}
+
+function AIResponseCard({ explanation, data, sql, chartRec, onFollowUp }: AIResponseCardProps) {
+  const observations = useMemo(() => {
+    if (!data.length) return [];
+    const cols = Object.keys(data[0]);
+    const obs: string[] = [];
+
+    obs.push(
+      `Returned ${data.length.toLocaleString()} row${data.length !== 1 ? 's' : ''} across ${cols.length} column${cols.length !== 1 ? 's' : ''}.`
+    );
+
+    const numCols = cols.filter((c) => typeof data[0][c] === 'number');
+    if (numCols.length > 0) {
+      const col = numCols[0];
+      const vals = data.map((r) => Number(r[col])).filter((n) => !isNaN(n));
+      if (vals.length > 1) {
+        const sum = vals.reduce((a, b) => a + b, 0);
+        const max = Math.max(...vals);
+        obs.push(`${col.replace(/_/g, ' ')}: total ${fmtNum(sum)}, peak ${fmtNum(max)}.`);
+      }
+    }
+
+    let nulls = 0;
+    data.forEach((row) => cols.forEach((c) => { if (row[c] === null || row[c] === undefined) nulls++; }));
+    if (nulls > 0) {
+      obs.push(`${nulls} missing value${nulls !== 1 ? 's' : ''} detected across the result set.`);
+    }
+
+    return obs;
+  }, [data]);
+
+  const followUps = useMemo(() => {
+    const q: string[] = [];
+    const up = sql.toUpperCase();
+    if (up.includes('GROUP BY'))        q.push('How has this changed over the last 3 months?');
+    if (!up.includes('LIMIT'))          q.push('Show only the top 10 results');
+    if (!up.includes('WHERE'))          q.push('Filter by a specific date range');
+    else                                q.push('Expand the filter to include more records');
+    if (data.length > 0) {
+      const firstCol = Object.keys(data[0])[0];
+      q.push(`Break down by ${firstCol.replace(/_/g, ' ')}`);
+    }
+    return q.slice(0, 3);
+  }, [sql, data]);
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden text-[13px]"
+      style={{ background: 'var(--ds-base-1)', border: '1px solid var(--ds-border-subtle)' }}
+    >
+      {/* Summary */}
+      {explanation && (
+        <div className="px-4 py-3.5 border-b border-border">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-content-3 mb-2 flex items-center gap-1.5">
+            <Sparkles className="h-3 w-3 text-brand" /> Summary
+          </p>
+          <p className="leading-relaxed text-content-2">{explanation}</p>
+        </div>
+      )}
+
+      {/* Key observations */}
+      {observations.length > 0 && (
+        <div className="px-4 py-3 border-b border-border">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-content-3 mb-2 flex items-center gap-1.5">
+            <TrendingUp className="h-3 w-3 text-brand" /> Key Observations
+          </p>
+          <ul className="space-y-1.5">
+            {observations.map((obs, i) => (
+              <li key={i} className="flex items-start gap-2 text-content-2">
+                <span className="mt-[7px] h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--ds-accent)' }} />
+                {obs}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Follow-up questions */}
+      {followUps.length > 0 && (
+        <div className="px-4 py-3 border-b border-border">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-content-3 mb-2 flex items-center gap-1.5">
+            <Zap className="h-3 w-3 text-brand" /> Suggested Follow-ups
+          </p>
+          <div className="space-y-1">
+            {followUps.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => onFollowUp?.(q)}
+                className="flex items-center gap-2 w-full text-left text-content-2 hover:text-content-1 py-0.5 transition-colors duration-[100ms]"
+              >
+                <ArrowRight className="h-3 w-3 text-content-3 flex-shrink-0" />
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Chart recommendation */}
+      {chartRec && chartRec.chart_type !== 'table' && (
+        <div className="px-4 py-3 flex items-center gap-2.5">
+          <BarChart3 className="h-3.5 w-3.5 text-brand flex-shrink-0" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-content-3">Recommended Viz</span>
+          <span
+            className="text-[11px] font-semibold px-2 py-0.5 rounded-md"
+            style={{ background: 'var(--ds-accent-muted)', color: 'var(--ds-accent)' }}
+          >
+            {CHART_LABELS[chartRec.chart_type] ?? chartRec.chart_type}
+          </span>
+          {chartRec.reason && (
+            <span className="text-content-3 text-[12px] truncate">{chartRec.reason}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Individual message ─────────────────────────────────────── */
 
 interface MessageProps {
@@ -115,9 +287,10 @@ interface MessageProps {
   onUpdate: (id: string, patch: Partial<ChatMessage>) => void;
   onSaveSnippet: (id: string) => void;
   connectionId: number | null;
+  onSelect?: (text: string) => void;
 }
 
-function Message({ msg, onUpdate, onSaveSnippet, connectionId }: MessageProps) {
+function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect }: MessageProps) {
   const { toast } = useToast();
 
   const displaySql = msg.editedSql || msg.sql || '';
@@ -180,14 +353,7 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId }: MessageProps) {
 
         <div className="flex-1 min-w-0 space-y-3">
           {/* Thinking state */}
-          {msg.status === 'thinking' && (
-            <div
-              className="rounded-2xl rounded-tl-sm px-4 py-3 inline-block"
-              style={{ background: 'var(--ds-base-1)', border: '1px solid var(--ds-border-subtle)' }}
-            >
-              <ThinkingDots />
-            </div>
-          )}
+          {msg.status === 'thinking' && <AIThinkingStages />}
 
           {/* Error state */}
           {msg.status === 'error' && (
@@ -203,12 +369,15 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId }: MessageProps) {
           {/* Ready state */}
           {msg.status === 'ready' && msg.sql && (
             <>
-              {/* Intro text */}
-              {msg.explanation && (
-                <p className="text-[15px] text-content-2 leading-relaxed">
-                  <span className="text-brand font-semibold">✦</span>{' '}
-                  {msg.explanation}
-                </p>
+              {/* AI response card */}
+              {(msg.explanation || (msg.data && msg.data.length > 0)) && (
+                <AIResponseCard
+                  explanation={msg.explanation ?? ''}
+                  data={msg.data ?? []}
+                  sql={msg.sql!}
+                  chartRec={msg.chartRec}
+                  onFollowUp={onSelect}
+                />
               )}
 
               {/* SQL block */}
@@ -832,7 +1001,7 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
 
       {/* Messages scroll area */}
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-        <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="max-w-5xl mx-auto px-4 py-6">
 
           {messages.length === 0 ? (
             <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 280px)' }}>
@@ -847,6 +1016,7 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
                   onUpdate={updateMessage}
                   onSaveSnippet={handleSaveSnippet}
                   connectionId={activeConnectionId}
+                  onSelect={handleSuggestion}
                 />
               ))}
               <div ref={bottomRef} />
@@ -860,7 +1030,7 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
         className="flex-shrink-0 border-t border-border px-4 py-5"
         style={{ background: 'var(--ds-base-0)' }}
       >
-        <div className="max-w-4xl mx-auto space-y-3">
+        <div className="max-w-5xl mx-auto space-y-3">
 
           {/* Connection selector */}
           {connections.length > 0 && (

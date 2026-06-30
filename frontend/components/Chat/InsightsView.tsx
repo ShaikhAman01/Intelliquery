@@ -127,6 +127,36 @@ function deriveKPIs(data: Record<string, unknown>[], stats: ColStats[]): KPI[] {
   return kpis.slice(0, 4);
 }
 
+function deriveObservations(data: Record<string, unknown>[], stats: ColStats[]): string[] {
+  const obs: string[] = [];
+  const numCols  = stats.filter(s => s.type === 'number');
+  const dateCols = stats.filter(s => s.type === 'date');
+  const catCols  = stats.filter(s => s.type === 'string');
+
+  if (data.length === 1)
+    obs.push('Single record returned — likely a summary or aggregate query.');
+  else if (data.length > 10_000)
+    obs.push(`Large result set: ${data.length.toLocaleString()} rows returned. Consider adding a LIMIT for faster queries.`);
+
+  if (dateCols.length > 0 && dateCols[0].minDate && dateCols[0].maxDate)
+    obs.push(`${dateCols[0].name.replace(/_/g, ' ')} spans ${dateCols[0].minDate} → ${dateCols[0].maxDate}.`);
+
+  const topNum = numCols.find(s => s.max !== undefined && s.mean !== undefined && s.mean > 0);
+  if (topNum && topNum.max! > topNum.mean! * 3)
+    obs.push(`${topNum.name.replace(/_/g, ' ')} shows high variance — max is ${(topNum.max! / topNum.mean!).toFixed(1)}× the average.`);
+
+  const highCard = catCols.find(s => s.unique > 50);
+  if (highCard)
+    obs.push(`${highCard.name.replace(/_/g, ' ')} has ${highCard.unique.toLocaleString()} distinct values — high cardinality.`);
+  else {
+    const lowCard = catCols.find(s => s.unique <= 20 && s.count > s.unique);
+    if (lowCard)
+      obs.push(`${lowCard.name.replace(/_/g, ' ')} has ${lowCard.unique} distinct values across ${lowCard.count.toLocaleString()} rows.`);
+  }
+
+  return obs.slice(0, 3);
+}
+
 function detectNotices(stats: ColStats[]): DataNotice[] {
   const notices: DataNotice[] = [];
   stats.forEach(s => {
@@ -201,9 +231,10 @@ function ColSelector({ label, columns, value, onChange }: { label: string; colum
 export function InsightsView({ sql, explanation, data, chartRec, executionTime }: InsightsViewProps) {
   const [tab, setTab] = useState<Tab>('overview');
 
-  const stats    = useMemo(() => computeStats(data), [data]);
-  const kpis     = useMemo(() => deriveKPIs(data, stats), [data, stats]);
-  const notices  = useMemo(() => detectNotices(stats), [stats]);
+  const stats        = useMemo(() => computeStats(data), [data]);
+  const kpis         = useMemo(() => deriveKPIs(data, stats), [data, stats]);
+  const notices      = useMemo(() => detectNotices(stats), [stats]);
+  const observations = useMemo(() => deriveObservations(data, stats), [data, stats]);
 
   const allCols     = data.length > 0 ? Object.keys(data[0]) : [];
   const stringCols  = stats.filter(s => s.type === 'string' || s.type === 'date').map(s => s.name);
@@ -353,13 +384,33 @@ export function InsightsView({ sql, explanation, data, chartRec, executionTime }
           </div>
 
           {/* AI Analysis */}
-          {explanation && (
-            <div className="rounded-xl border border-border p-4 space-y-2" style={{ background: 'var(--ds-base-1)' }}>
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-brand flex-shrink-0" />
-                <span className="text-[13px] font-semibold text-content-1">AI Analysis</span>
+          {(explanation || observations.length > 0) && (
+            <div className="rounded-xl border border-border overflow-hidden" style={{ background: 'var(--ds-base-1)' }}>
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-border" style={{ background: 'var(--ds-base-2)' }}>
+                <Sparkles className="h-3.5 w-3.5 text-brand flex-shrink-0" />
+                <span className="text-[12px] font-semibold text-content-1">AI Analysis</span>
               </div>
-              <p className="text-[14px] leading-relaxed text-content-2">{explanation}</p>
+              <div className="p-4 space-y-4">
+                {explanation && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ds-text-3)' }}>Summary</p>
+                    <p className="text-[14px] leading-relaxed text-content-2">{explanation}</p>
+                  </div>
+                )}
+                {observations.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ds-text-3)' }}>Key Observations</p>
+                    <ul className="space-y-1.5">
+                      {observations.map((obs, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[13px] text-content-2">
+                          <span className="mt-[3px] h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--ds-accent)' }} />
+                          {obs}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -439,7 +490,7 @@ export function InsightsView({ sql, explanation, data, chartRec, executionTime }
                           ) : s.type === 'date' ? (
                             <span className="font-mono text-[11px] text-content-2">{s.minDate} → {s.maxDate}</span>
                           ) : s.topValue ? (
-                            <span>
+                            <span className="truncate block">
                               <span className="font-mono text-content-2">"{s.topValue}"</span>
                               {s.topCount && s.count > 1 && (
                                 <span className="text-content-3"> × {s.topCount} ({((s.topCount / s.count) * 100).toFixed(0)}%)</span>
