@@ -1,3 +1,4 @@
+import re
 import time
 import asyncio
 from typing import List, Dict, Optional
@@ -17,6 +18,49 @@ from app.executor.sql_runner import SQLRunner
 from app.core.logger import logger
 
 router = APIRouter()
+
+# ── Schema-validation helpers ─────────────────────────────────────────────────
+
+# Errors from Postgres and MySQL that mean a table or column name doesn't exist.
+_SCHEMA_ERROR_PATTERNS = [
+    r'relation ".+?" does not exist',          # PG: unknown table
+    r'column ".+?" does not exist',            # PG: unknown column
+    r'column .+? does not exist',              # PG variant (unquoted)
+    r"table .+? doesn't exist",               # MySQL: unknown table
+    r'unknown column',                         # MySQL: unknown column
+    r'no such table',                          # SQLite
+    r'no such column',                         # SQLite
+]
+
+
+def _is_schema_error(error_msg: str) -> bool:
+    """Return True when a DB error is caused by a hallucinated table/column name."""
+    msg = error_msg.lower()
+    return any(re.search(p, msg, re.IGNORECASE) for p in _SCHEMA_ERROR_PATTERNS)
+
+
+def _extract_cte_names(sql: str) -> set:
+    """Extract CTE alias names so they are not treated as real table references."""
+    # Matches: WITH cte_name AS ( ...
+    return {m.lower() for m in re.findall(r'\b(\w+)\s+AS\s*\(', sql, re.IGNORECASE)}
+
+
+def _unknown_tables_in_sql(sql: str, schema: dict) -> list:
+    """
+    Parse FROM / JOIN clauses and return table names that don't exist in schema.
+    CTE aliases and subquery wrappers are excluded to prevent false positives.
+    Returns an empty list when every reference is valid (or unparseable).
+    """
+    cte_names = _extract_cte_names(sql)
+    known = {t.lower() for t in schema}
+
+    # Match FROM/JOIN <optional-quote><identifier><optional-quote>
+    # The word-char requirement means subquery wrappers `FROM (SELECT` never match.
+    found = re.findall(r'(?:FROM|JOIN)\s+"?(\w+)"?', sql, re.IGNORECASE)
+    return [t for t in found if t.lower() not in cte_names and t.lower() not in known]
+
+
+# ── Core execution services ───────────────────────────────────────────────────
 
 # Instantiate core execution services
 nlp = NLPProcessor()
@@ -118,19 +162,62 @@ async def process_query(
     if not sql_query:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Could not parse an executable SQL statement.")
 
-    # ── 4. Isolated Query Execution ──────────────────────────────────────────
+    # ── 4a. Pre-execution table validation (LLM output only) ─────────────────
+    # Check FROM/JOIN references against the full schema before hitting the DB.
+    # Catches hallucinated table names immediately, saving a round-trip.
+    if source == "LLM_FALLBACK":
+        unknown = _unknown_tables_in_sql(sql_query, full_schema)
+        if unknown:
+            logger.warning(f"Pre-exec validation: SQL references unknown tables {unknown} — attempting repair.")
+            try:
+                sql_query = await llm.repair_sql(
+                    sql_query,
+                    f"The following tables do not exist in the schema: {unknown}",
+                    user_query,
+                    schema_str,
+                    connection.db_type,
+                )
+                source = "LLM_REPAIRED"
+                logger.info("Pre-exec repair succeeded.")
+            except Exception as repair_err:
+                logger.error(f"Pre-exec repair failed: {repair_err}")
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"SQL generation failed: referenced tables {unknown} do not exist in schema.",
+                )
+
+    # ── 4b. Isolated Query Execution ─────────────────────────────────────────
     execution_status = "SUCCESS"
     error_msg = None
     data = []
     start_time = time.time()
+    max_rows = nlp_result.get("limit") or executor.DEFAULT_MAX_ROWS
 
     try:
-        max_rows = nlp_result.get("limit") or executor.DEFAULT_MAX_ROWS
         data = await executor.run_query(sql_query, connection, max_rows=max_rows)
     except Exception as e:
-        execution_status = "ERROR"
-        error_msg = str(e)
-        logger.error(f"Isolated connection pipeline engine failure: {error_msg}")
+        raw_error = str(e)
+
+        # Attempt one-shot repair when the DB reports a missing table/column
+        # and the SQL came from the LLM (not user edits or the template engine).
+        if source in ("LLM_FALLBACK", "LLM_REPAIRED") and _is_schema_error(raw_error):
+            logger.warning(f"Post-exec schema error detected — attempting repair: {raw_error}")
+            try:
+                repaired_sql = await llm.repair_sql(
+                    sql_query, raw_error, user_query, schema_str, connection.db_type
+                )
+                data = await executor.run_query(repaired_sql, connection, max_rows=max_rows)
+                sql_query = repaired_sql
+                source = "LLM_REPAIRED"
+                logger.info("Post-exec repair succeeded.")
+            except Exception as repair_err:
+                execution_status = "ERROR"
+                error_msg = raw_error   # surface the original DB error, not the repair error
+                logger.error(f"Post-exec repair also failed: {repair_err}")
+        else:
+            execution_status = "ERROR"
+            error_msg = raw_error
+            logger.error(f"Query execution failed: {raw_error}")
 
     execution_time_ms = int((time.time() - start_time) * 1000)
 

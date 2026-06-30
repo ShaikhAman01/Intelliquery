@@ -230,6 +230,57 @@ Schema:
             f"All LLM providers failed. Last error: {last_error}"
         )
 
+    async def repair_sql(
+        self,
+        original_sql: str,
+        error: str,
+        user_query: str,
+        schema_str: str,
+        db_type: str = "postgres",
+    ) -> str:
+        """
+        One-shot SQL repair.  Called when generated SQL fails either a pre-execution
+        table-name check or a live DB execution with a schema error.
+
+        Strategy: give the LLM the broken SQL, the exact error, and the schema.
+        Ask it to fix naming errors only — not rewrite logic.
+        """
+        system_prompt = (
+            f"You are an expert {db_type} SQL debugger.\n"
+            f"A generated SQL query failed. Your task:\n"
+            f"1. Fix ONLY incorrect table or column names — use the schema below.\n"
+            f"2. Do NOT change the query logic, structure, or intent.\n"
+            f"3. Output ONLY the corrected SQL. No markdown, no explanation.\n"
+            f"4. End with a semicolon.\n\n"
+            f"Schema:\n{schema_str}"
+        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": (
+                    f"Original question: {user_query}\n\n"
+                    f"Failed SQL:\n{original_sql}\n\n"
+                    f"Error:\n{error}\n\n"
+                    f"Return only the corrected SQL."
+                ),
+            },
+        ]
+
+        last_error = None
+        for provider in self.providers:
+            try:
+                logger.info(f"🔧 Attempting SQL repair with {provider.name}...")
+                sql = provider.generate_sql(messages, temperature=0.0)
+                logger.info(f"✅ SQL repaired by {provider.name}")
+                return sql
+            except Exception as e:
+                last_error = e
+                logger.warning(f"⚠️ Repair with {provider.name} failed: {e}")
+                continue
+
+        raise Exception(f"SQL repair failed — all providers exhausted. Last error: {last_error}")
+
     async def generate_insights(self, user_text: str, data_sample: list) -> dict:
         """Generate comprehensive data insights with patterns, anomalies, and recommendations and chart type recommendation."""
         prompt = f"""User question: "{user_text}"
