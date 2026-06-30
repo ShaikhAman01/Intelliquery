@@ -87,17 +87,6 @@ export function LandingPage() {
       <main className="relative z-10 mx-auto max-w-6xl px-6 pt-16 pb-24">
         <div className="flex flex-col items-center text-center">
 
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-border px-3.5 py-1.5 text-[12px] font-medium text-content-3"
-            style={{ background: 'var(--ds-base-1)' }}
-          >
-            <Sparkles className="h-3 w-3 text-brand" />
-            AI-powered SQL analytics
-          </motion.div>
-
           <motion.h1
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
