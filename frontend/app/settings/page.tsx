@@ -181,7 +181,14 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
 
   const initial = (user?.name?.[0] || user?.email?.[0] || 'U').toUpperCase();
   const shortId = user?.id ? user.id.replace(/-/g, '').slice(-8).toUpperCase() : '—';
-  const roleLabel = user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : 'Member';
+  const roleLabel = user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : null;
+  const roleColor: Record<string, { text: string; bg: string; border: string }> = {
+    owner:  { text: 'var(--ds-warning)',  bg: 'var(--ds-warning-muted)',  border: 'var(--ds-warning-border)'  },
+    admin:  { text: '#60a5fa',            bg: 'rgba(37,99,235,0.08)',     border: 'rgba(37,99,235,0.20)'      },
+    editor: { text: 'var(--ds-success)',  bg: 'var(--ds-success-muted)',  border: 'var(--ds-success-border)'  },
+    viewer: { text: 'var(--ds-text-2)',   bg: 'var(--ds-base-2)',         border: 'var(--ds-border-subtle)'   },
+  };
+  const roleStyle = roleColor[user?.role ?? ''] ?? roleColor.viewer;
 
   const handleSave = async () => {
     if (!name.trim()) return;
@@ -282,16 +289,16 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
                 </span>
               ),
             },
-            {
+            ...(roleLabel ? [{
               label: 'Role',
               value: null,
               suffix: (
                 <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                  style={{ background: 'var(--ds-warning-muted)', color: 'var(--ds-warning)', border: '1px solid var(--ds-warning-border)' }}>
+                  style={{ background: roleStyle.bg, color: roleStyle.text, border: `1px solid ${roleStyle.border}` }}>
                   <Shield className="h-3 w-3" /> {roleLabel}
                 </span>
               ),
-            },
+            }] : []),
             {
               label: 'Account ID',
               value: shortId,
@@ -533,10 +540,10 @@ function OrgTab({ existingOrg, setExistingOrg }: {
       <Section title="Role permissions" description="What each member role can do">
         <div className="rounded-xl overflow-hidden border border-border">
           {[
-            { role: 'Owner',  desc: 'Full control — billing, members, all settings',     color: 'var(--ds-warning)',  bg: 'var(--ds-warning-muted)',  border: 'var(--ds-warning-border)' },
-            { role: 'Admin',  desc: 'Manage members and database connections',            color: '#60a5fa',            bg: 'rgba(37,99,235,0.08)',     border: 'rgba(37,99,235,0.20)'     },
-            { role: 'Editor', desc: 'Run queries, save snippets, view all connections',  color: 'var(--ds-success)',  bg: 'var(--ds-success-muted)',  border: 'var(--ds-success-border)' },
-            { role: 'Viewer', desc: 'Read-only access to shared queries',                color: 'var(--ds-text-2)',   bg: 'var(--ds-base-2)',         border: 'var(--ds-border-subtle)'  },
+            { role: 'Owner',  desc: 'Full access — change member roles, all admin actions',  color: 'var(--ds-warning)',  bg: 'var(--ds-warning-muted)',  border: 'var(--ds-warning-border)' },
+            { role: 'Admin',  desc: 'Invite & remove members, delete connections',           color: '#60a5fa',            bg: 'rgba(37,99,235,0.08)',     border: 'rgba(37,99,235,0.20)'     },
+            { role: 'Editor', desc: 'Add, refresh & toggle database connections',            color: 'var(--ds-success)',  bg: 'var(--ds-success-muted)',  border: 'var(--ds-success-border)' },
+            { role: 'Viewer', desc: 'Run queries and view history — no structural changes',  color: 'var(--ds-text-2)',   bg: 'var(--ds-base-2)',         border: 'var(--ds-border-subtle)'  },
           ].map(({ role, desc, color, bg, border }, i, arr) => (
             <div
               key={role}

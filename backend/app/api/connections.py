@@ -51,7 +51,7 @@ class ConnectionStatusUpdate(BaseModel):
 @router.post("/test")
 def test_connection(
     conn_data: ConnectionTest,
-    current_user: User = Depends(require_viewer),
+    current_user: User = Depends(require_editor),
 ):
     """
     Test a database connection and return schema without saving.
@@ -130,7 +130,7 @@ def test_saved_connection(
 def create_connection(
     conn_data: ConnectionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_viewer),
+    current_user: User = Depends(require_editor),
 ):
     """
     1. Encrypts the password.
