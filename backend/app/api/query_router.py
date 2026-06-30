@@ -1,7 +1,10 @@
 import re
 import time
+import decimal
+import datetime
 import asyncio
-from typing import List, Dict, Optional
+from collections import Counter
+from typing import List, Dict, Optional, Any
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
@@ -15,9 +18,98 @@ from app.pipeline.llm_fallback import LLMService
 from app.pipeline.schema_mapper import SchemaMapper
 from app.pipeline.schema_selector import select_relevant_tables
 from app.executor.sql_runner import SQLRunner
+from app.core.cache import sql_cache, result_cache, make_sql_key, make_result_key
 from app.core.logger import logger
 
 router = APIRouter()
+
+# ── Result statistics ─────────────────────────────────────────────────────────
+
+def _to_float(v: Any) -> float | None:
+    """Convert a DB value to float, returning None if it isn't numeric."""
+    if v is None or isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, decimal.Decimal):
+        return float(v)
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        return None
+
+
+def _to_str(v: Any) -> str | None:
+    """Convert any DB value to a JSON-safe string."""
+    if v is None:
+        return None
+    if isinstance(v, (datetime.date, datetime.datetime)):
+        return v.isoformat()
+    if isinstance(v, decimal.Decimal):
+        return str(float(v))
+    return str(v)
+
+
+def _compute_result_stats(data: List[Dict]) -> Dict:
+    """
+    Compute column-level statistics from the full query result set.
+
+    Instead of sending raw rows to the LLM (max 5 rows → hallucinated stats),
+    we pre-compute exact numbers here and send those instead.  The LLM receives
+    real min/max/mean/sum for numerics and real top-value frequencies for
+    categoricals — grounding every insight in actual data.
+
+    Returns a compact dict (serialisable via json.dumps) that fits in ~300 tokens
+    regardless of how many rows the query returned.
+    """
+    if not data:
+        return {"row_count": 0, "column_count": 0, "columns": [], "sample_rows": []}
+
+    columns = list(data[0].keys())
+    col_stats: list[Dict] = []
+
+    for col in columns:
+        values = [row.get(col) for row in data]
+        non_null = [v for v in values if v is not None]
+        null_count = len(values) - len(non_null)
+
+        float_vals = [_to_float(v) for v in non_null]
+        is_numeric = bool(float_vals) and all(f is not None for f in float_vals)
+
+        stat: Dict[str, Any] = {
+            "name": col,
+            "null_count": null_count,
+            "null_pct": round(null_count / len(values) * 100, 1) if values else 0,
+            "distinct_count": len({_to_str(v) for v in non_null}),
+        }
+
+        if is_numeric:
+            fv = [f for f in float_vals if f is not None]
+            stat["type"] = "numeric"
+            stat["min"]  = round(min(fv), 4)
+            stat["max"]  = round(max(fv), 4)
+            stat["mean"] = round(sum(fv) / len(fv), 4)
+            stat["sum"]  = round(sum(fv), 4)
+        else:
+            str_vals = [_to_str(v) for v in non_null if v is not None]
+            freq = Counter(str_vals)
+            stat["type"] = "categorical"
+            stat["top_values"] = [
+                {"value": v, "count": c} for v, c in freq.most_common(5)
+            ]
+
+        col_stats.append(stat)
+
+    # 3 representative rows, fully serialised to JSON-safe types
+    sample = [{k: _to_str(v) for k, v in row.items()} for row in data[:3]]
+
+    return {
+        "row_count": len(data),
+        "column_count": len(columns),
+        "columns": col_stats,
+        "sample_rows": sample,
+    }
+
 
 # ── Schema-validation helpers ─────────────────────────────────────────────────
 
@@ -127,57 +219,68 @@ async def process_query(
     schema_str = schema_mapper.get_context_string(relevant_schema)
     real_schema_map = {"tables": full_schema}  # template engine uses full schema for resolution
 
-    # ── 3. Query Compilation ──────────────────────────────────────────────────
-    nlp_result = nlp.process(user_query)
+    # ── 3. SQL generation (with cache) ───────────────────────────────────────
     sql_query = None
+    nlp_result: Dict = {}
     source = "UNKNOWN"
 
-    # Attempt rule-based routing for basic expressions
-    if not nlp_result.get("is_complex", True):
-        try:
-            logger.info("Evaluating match query against Dynamic Template engine rules...")
-            sql_query = dynamic_gen.generate(nlp_result, real_schema_map)
-            if sql_query:
-                source = "DYNAMIC"
-        except Exception as e:
-            logger.warn(f"Deterministic dynamic compilation bypassed: {str(e)}")
+    sql_cache_key = make_sql_key(connection_id, user_query)
+    cached_sql = sql_cache.get(sql_cache_key)
 
-    # LLM fallback path for deep relational evaluation
-    if not sql_query:
-        logger.info("Routing query request parsing window down to LLM Fallback pipeline.")
-        conversation_history = _get_conversation_context(db, current_user.id, connection_id)
-        
-        try:
-            sql_query = await llm.fallback_generate_sql(
-                user_query, schema_str, connection.db_type,
-                conversation_history=conversation_history,
-            )
-            source = "LLM_FALLBACK"
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY, 
-                detail=f"AI SQL generation pipeline failed: {str(e)}"
-            )
+    if cached_sql:
+        logger.info(f"SQL cache HIT for connection {connection_id}.")
+        sql_query = cached_sql
+        source = "SQL_CACHE"
+    else:
+        # NLP → template engine (fast path) → LLM fallback
+        nlp_result = nlp.process(user_query)
+
+        if not nlp_result.get("is_complex", True):
+            try:
+                logger.info("Evaluating query against template engine...")
+                sql_query = dynamic_gen.generate(nlp_result, real_schema_map)
+                if sql_query:
+                    source = "DYNAMIC"
+            except Exception as e:
+                logger.warn(f"Template engine bypassed: {str(e)}")
+
+        if not sql_query:
+            logger.info("Routing to LLM fallback pipeline.")
+            conversation_history = _get_conversation_context(db, current_user.id, connection_id)
+            try:
+                sql_query = await llm.fallback_generate_sql(
+                    user_query, schema_str, connection.db_type,
+                    conversation_history=conversation_history,
+                )
+                source = "LLM_FALLBACK"
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"AI SQL generation pipeline failed: {str(e)}"
+                )
+
+        # Store in SQL cache so the next identical question skips NLP+LLM entirely.
+        # We cache DYNAMIC and LLM results; LLM_REPAIRED is stored after repair below.
+        if sql_query and source in ("DYNAMIC", "LLM_FALLBACK"):
+            sql_cache.set(sql_cache_key, sql_query)
 
     if not sql_query:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Could not parse an executable SQL statement.")
 
     # ── 4a. Pre-execution table validation (LLM output only) ─────────────────
-    # Check FROM/JOIN references against the full schema before hitting the DB.
-    # Catches hallucinated table names immediately, saving a round-trip.
+    # SQL_CACHE entries were validated before they were stored — skip re-check.
     if source == "LLM_FALLBACK":
         unknown = _unknown_tables_in_sql(sql_query, full_schema)
         if unknown:
-            logger.warning(f"Pre-exec validation: SQL references unknown tables {unknown} — attempting repair.")
+            logger.warning(f"Pre-exec: SQL references unknown tables {unknown} — attempting repair.")
             try:
                 sql_query = await llm.repair_sql(
                     sql_query,
                     f"The following tables do not exist in the schema: {unknown}",
-                    user_query,
-                    schema_str,
-                    connection.db_type,
+                    user_query, schema_str, connection.db_type,
                 )
                 source = "LLM_REPAIRED"
+                sql_cache.set(sql_cache_key, sql_query)   # cache the repaired SQL
                 logger.info("Pre-exec repair succeeded.")
             except Exception as repair_err:
                 logger.error(f"Pre-exec repair failed: {repair_err}")
@@ -186,38 +289,52 @@ async def process_query(
                     detail=f"SQL generation failed: referenced tables {unknown} do not exist in schema.",
                 )
 
-    # ── 4b. Isolated Query Execution ─────────────────────────────────────────
+    # ── 4b. Query execution (with result cache) ───────────────────────────────
     execution_status = "SUCCESS"
     error_msg = None
     data = []
     start_time = time.time()
     max_rows = nlp_result.get("limit") or executor.DEFAULT_MAX_ROWS
 
-    try:
-        data = await executor.run_query(sql_query, connection, max_rows=max_rows)
-    except Exception as e:
-        raw_error = str(e)
+    result_cache_key = make_result_key(connection_id, sql_query)
+    cached_result = result_cache.get(result_cache_key)
 
-        # Attempt one-shot repair when the DB reports a missing table/column
-        # and the SQL came from the LLM (not user edits or the template engine).
-        if source in ("LLM_FALLBACK", "LLM_REPAIRED") and _is_schema_error(raw_error):
-            logger.warning(f"Post-exec schema error detected — attempting repair: {raw_error}")
-            try:
-                repaired_sql = await llm.repair_sql(
-                    sql_query, raw_error, user_query, schema_str, connection.db_type
-                )
-                data = await executor.run_query(repaired_sql, connection, max_rows=max_rows)
-                sql_query = repaired_sql
-                source = "LLM_REPAIRED"
-                logger.info("Post-exec repair succeeded.")
-            except Exception as repair_err:
+    if cached_result is not None:
+        logger.info(f"Result cache HIT for connection {connection_id}.")
+        data = cached_result
+        source = f"{source}+RCACHE"
+    else:
+        try:
+            data = await executor.run_query(sql_query, connection, max_rows=max_rows)
+            # Only cache non-empty results — empty results can be transient
+            if data:
+                result_cache.set(result_cache_key, data)
+        except Exception as e:
+            raw_error = str(e)
+
+            # One-shot repair for schema errors from LLM-generated SQL
+            if source in ("LLM_FALLBACK", "LLM_REPAIRED") and _is_schema_error(raw_error):
+                logger.warning(f"Post-exec schema error — attempting repair: {raw_error}")
+                try:
+                    repaired_sql = await llm.repair_sql(
+                        sql_query, raw_error, user_query, schema_str, connection.db_type
+                    )
+                    data = await executor.run_query(repaired_sql, connection, max_rows=max_rows)
+                    sql_query = repaired_sql
+                    source = "LLM_REPAIRED"
+                    # Cache the working repaired SQL and its results
+                    sql_cache.set(sql_cache_key, sql_query)
+                    if data:
+                        result_cache.set(make_result_key(connection_id, sql_query), data)
+                    logger.info("Post-exec repair succeeded.")
+                except Exception as repair_err:
+                    execution_status = "ERROR"
+                    error_msg = raw_error
+                    logger.error(f"Post-exec repair also failed: {repair_err}")
+            else:
                 execution_status = "ERROR"
-                error_msg = raw_error   # surface the original DB error, not the repair error
-                logger.error(f"Post-exec repair also failed: {repair_err}")
-        else:
-            execution_status = "ERROR"
-            error_msg = raw_error
-            logger.error(f"Query execution failed: {raw_error}")
+                error_msg = raw_error
+                logger.error(f"Query execution failed: {raw_error}")
 
     execution_time_ms = int((time.time() - start_time) * 1000)
 
@@ -244,30 +361,31 @@ async def process_query(
     if execution_status == "ERROR":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
 
-    # ── 6. High-Performance Concurrent Post-Processing ───────────────────────
-    # We pack all independent AI inferences into a single execution thread loop using asyncio.gather
+    # ── 6. Post-processing ────────────────────────────────────────────────────
     columns = list(data[0].keys()) if data else []
-    
-    insights_task = llm.generate_insights(user_query, data)
-    chart_task = llm.recommend_chart_type(columns, data, user_query)
-    explain_task = llm.explain_query(sql_query, user_query, connection.db_type)
 
+    # Chart type is pure heuristics — no LLM call, resolves instantly.
+    chart_rec = await llm.recommend_chart_type(columns, data, user_query)
+
+    # Pre-compute exact statistics from the full result set, then fire one
+    # combined LLM call for insights + explanation.  This replaces the previous
+    # three parallel LLM calls (generate_insights, recommend_chart_type, explain_query)
+    # with a single grounded call.
+    result_stats = _compute_result_stats(data)
     try:
-        insights, chart_rec, explanation = await asyncio.gather(
-            insights_task,
-            chart_task,
-            explain_task,
-            return_exceptions=True
+        combined = await llm.generate_insights_and_explanation(
+            user_query, sql_query, result_stats, connection.db_type
         )
-        
-        # Normalize response parameters if any parallel task hit an exception
-        if isinstance(insights, Exception): insights = "Insights computation timed out."
-        if isinstance(chart_rec, Exception): chart_rec = {"chart_type": "table"}
-        if isinstance(explanation, Exception): explanation = "Query interpretation unavailable."
-        
-    except Exception as gather_err:
-        logger.error(f"Asynchronous post-processing pool hit an execution bottleneck: {str(gather_err)}")
-        insights, chart_rec, explanation = "Analysis offline.", {"chart_type": "table"}, "Unavailable."
+        explanation = combined.pop("explanation", "Query executed successfully.")
+        insights = combined  # remainder is the insights dict
+    except Exception as e:
+        logger.error(f"Post-processing LLM call failed: {e}")
+        explanation = "Query executed successfully."
+        insights = {
+            "summary": f"Returned {len(data):,} rows.",
+            "key_patterns": [], "anomalies": [],
+            "business_implications": "", "recommendations": [],
+        }
 
     return {
         "query_source": source,

@@ -281,6 +281,102 @@ Schema:
 
         raise Exception(f"SQL repair failed — all providers exhausted. Last error: {last_error}")
 
+    def _parse_json_response(self, raw: str) -> dict:
+        """Strip markdown fences and parse JSON, raising on failure."""
+        text = raw.strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?\s*", "", text)
+            text = re.sub(r"\s*```$", "", text)
+        return json.loads(text.strip())
+
+    async def generate_insights_and_explanation(
+        self,
+        user_query: str,
+        sql: str,
+        stats: dict,
+        db_type: str = "postgres",
+    ) -> dict:
+        """
+        Single LLM call that replaces the previous separate generate_insights()
+        and explain_query() calls.
+
+        Receives pre-computed column statistics (not raw rows) so every insight
+        is grounded in exact numbers derived from the full result set.
+
+        Returns a dict with:
+          explanation   — plain-English description of what the SQL does
+          summary       — 2-3 sentence key finding
+          key_patterns  — list of specific, data-backed observations
+          anomalies     — list of outliers / unexpected values (empty if none)
+          business_implications — business context sentence
+          recommendations      — list of actionable next steps
+        """
+        stats_json = json.dumps(stats, default=str, indent=2)
+
+        # Empty result: return a grounded fallback without calling the LLM
+        if stats.get("row_count", 0) == 0:
+            return {
+                "explanation": f"The query executed successfully but returned no rows. "
+                               f"This may mean no data matches the filter conditions.",
+                "summary": "No data was returned by this query.",
+                "key_patterns": [],
+                "anomalies": [],
+                "business_implications": "Verify that the filter conditions are correct and that the data exists.",
+                "recommendations": ["Check date ranges, status filters, or JOIN conditions that may be too restrictive."],
+            }
+
+        system_prompt = (
+            f"You are a senior data analyst and {db_type} SQL expert.\n"
+            f"You will receive pre-computed statistics for a query result — use ONLY these numbers.\n"
+            f"Do not invent values, ranges, or patterns not supported by the statistics.\n"
+            f"Return valid JSON only, no markdown, no prose outside the JSON."
+        )
+
+        user_prompt = (
+            f"User question: \"{user_query}\"\n\n"
+            f"SQL executed:\n{sql}\n\n"
+            f"Result statistics (computed from all {stats['row_count']} rows):\n"
+            f"{stats_json}\n\n"
+            f"Return a single JSON object with these exact keys:\n"
+            f"{{\n"
+            f'  "explanation": "2-3 sentences describing what the SQL query does in plain English — no technical jargon",\n'
+            f'  "summary": "2-3 sentences identifying the most important finding, citing specific numbers from the statistics",\n'
+            f'  "key_patterns": ["At least 2 specific, data-backed observations (cite actual numbers)"],\n'
+            f'  "anomalies": ["Any outliers, gaps, or unexpected values — empty array if none"],\n'
+            f'  "business_implications": "1-2 sentences on what this data means for the business",\n'
+            f'  "recommendations": ["1-3 actionable next steps based strictly on the data"]\n'
+            f"}}"
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ]
+
+        last_error = None
+        for provider in self.providers:
+            try:
+                raw = provider.generate_insights(messages, temperature=0.3)
+                return self._parse_json_response(raw)
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ JSON parse failed from {provider.name}: {e}")
+                last_error = e
+                continue
+            except Exception as e:
+                last_error = e
+                logger.warning(f"⚠️ Insights+explanation from {provider.name} failed: {e}")
+                continue
+
+        logger.error(f"All providers failed for insights+explanation: {last_error}")
+        return {
+            "explanation": "Query executed successfully.",
+            "summary": f"Returned {stats['row_count']:,} rows across {stats['column_count']} columns.",
+            "key_patterns": [],
+            "anomalies": [],
+            "business_implications": "",
+            "recommendations": [],
+        }
+
     async def generate_insights(self, user_text: str, data_sample: list) -> dict:
         """Generate comprehensive data insights with patterns, anomalies, and recommendations and chart type recommendation."""
         prompt = f"""User question: "{user_text}"

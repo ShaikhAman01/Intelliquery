@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine, text
+from sqlalchemy.pool import StaticPool
 from app.core.security import decrypt_password
 from app.models.core import DbConnection
 from app.core.logger import logger
@@ -15,23 +16,23 @@ class ClientDBManager:
     def _build_url(cls, connection_model: DbConnection, password: str) -> str:
         """Build connection URL with optional SSL."""
         use_ssl = getattr(connection_model, "use_ssl", False)
+        db_type = connection_model.db_type
+        u, h, p, db = (connection_model.username, connection_model.host,
+                       connection_model.port, connection_model.db_name)
 
-        if connection_model.db_type == "postgres":
+        if db_type in ("postgres", "cockroach"):
             ssl_param = "?sslmode=require" if use_ssl else ""
-            return (
-                f"postgresql://{connection_model.username}:{password}"
-                f"@{connection_model.host}:{connection_model.port}"
-                f"/{connection_model.db_name}{ssl_param}"
-            )
-        elif connection_model.db_type == "mysql":
+            return f"postgresql://{u}:{password}@{h}:{p}/{db}{ssl_param}"
+        elif db_type in ("mysql", "mariadb"):
             ssl_param = "?ssl=true" if use_ssl else ""
-            return (
-                f"mysql+pymysql://{connection_model.username}:{password}"
-                f"@{connection_model.host}:{connection_model.port}"
-                f"/{connection_model.db_name}{ssl_param}"
-            )
+            return f"mysql+pymysql://{u}:{password}@{h}:{p}/{db}{ssl_param}"
+        elif db_type == "mssql":
+            ssl_param = "?encrypt=true" if use_ssl else ""
+            return f"mssql+pymssql://{u}:{password}@{h}:{p}/{db}{ssl_param}"
+        elif db_type == "sqlite":
+            return f"sqlite:///{db}"
         else:
-            raise ValueError(f"Unsupported database type: {connection_model.db_type}")
+            raise ValueError(f"Unsupported database type: {db_type}")
 
     @classmethod
     def get_engine(cls, connection_model: DbConnection):
@@ -51,13 +52,21 @@ class ClientDBManager:
         real_password = decrypt_password(connection_model.encrypted_password)
         db_url = cls._build_url(connection_model, real_password)
 
-        engine = create_engine(
-            db_url,
-            pool_size=5,
-            max_overflow=10,
-            pool_recycle=3600,
-            pool_pre_ping=True,
-        )
+        if connection_model.db_type == "sqlite":
+            # SQLite is a file — single shared connection, thread-safe via lock
+            engine = create_engine(
+                db_url,
+                connect_args={"check_same_thread": False},
+                poolclass=StaticPool,
+            )
+        else:
+            engine = create_engine(
+                db_url,
+                pool_size=5,
+                max_overflow=10,
+                pool_recycle=3600,
+                pool_pre_ping=True,
+            )
 
         cls._engines[conn_id] = engine
         return engine

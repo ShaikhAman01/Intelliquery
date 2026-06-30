@@ -25,23 +25,23 @@ class SchemaMapper:
         """Build connection URL with optional SSL."""
         real_password = decrypt_password(connection_model.encrypted_password)
         use_ssl = getattr(connection_model, "use_ssl", False)
+        db_type = connection_model.db_type
+        u, h, p, db = (connection_model.username, connection_model.host,
+                       connection_model.port, connection_model.db_name)
 
-        if connection_model.db_type == "postgres":
+        if db_type in ("postgres", "cockroach"):
             ssl_param = "?sslmode=require" if use_ssl else ""
-            return (
-                f"postgresql://{connection_model.username}:{real_password}"
-                f"@{connection_model.host}:{connection_model.port}"
-                f"/{connection_model.db_name}{ssl_param}"
-            )
-        elif connection_model.db_type == "mysql":
+            return f"postgresql://{u}:{real_password}@{h}:{p}/{db}{ssl_param}"
+        elif db_type in ("mysql", "mariadb"):
             ssl_param = "?ssl=true" if use_ssl else ""
-            return (
-                f"mysql+pymysql://{connection_model.username}:{real_password}"
-                f"@{connection_model.host}:{connection_model.port}"
-                f"/{connection_model.db_name}{ssl_param}"
-            )
+            return f"mysql+pymysql://{u}:{real_password}@{h}:{p}/{db}{ssl_param}"
+        elif db_type == "mssql":
+            ssl_param = "?encrypt=true" if use_ssl else ""
+            return f"mssql+pymssql://{u}:{real_password}@{h}:{p}/{db}{ssl_param}"
+        elif db_type == "sqlite":
+            return f"sqlite:///{db}"
         else:
-            raise ValueError(f"Unsupported database type: {connection_model.db_type}")
+            raise ValueError(f"Unsupported database type: {db_type}")
 
     def _is_sampleable(self, type_str: str) -> bool:
         """Return True if this column type is worth sampling for enum-like values."""
@@ -64,7 +64,7 @@ class SchemaMapper:
             quoted = f'"{table_name}"'
             col_q  = f'"{col_name}"'
 
-            if db_type == "postgres":
+            if db_type in ("postgres", "cockroach"):
                 conn.execute(text("SET LOCAL statement_timeout = '3s'"))
 
             # Fetch one more than the limit so we can detect high-cardinality

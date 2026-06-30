@@ -10,6 +10,7 @@ from app.middleware.auth import get_current_user, require_viewer, require_editor
 from app.core.security import encrypt_password, decrypt_password
 from app.pipeline.schema_mapper import SchemaMapper
 from app.core.client_db_manager import ClientDBManager
+from app.core.cache import sql_cache
 from app.core.logger import logger
 
 router = APIRouter()
@@ -63,7 +64,8 @@ def test_connection(
             conn_data.db_type, conn_data.username, conn_data.password,
             conn_data.host, conn_data.port, conn_data.db_name, conn_data.use_ssl,
         )
-        engine = create_engine(db_url, connect_args={"connect_timeout": 10})
+        engine_kwargs = {} if conn_data.db_type == "sqlite" else {"connect_args": {"connect_timeout": 10}}
+        engine = create_engine(db_url, **engine_kwargs)
 
         schema_snapshot = {}
         with engine.connect() as conn:
@@ -220,6 +222,12 @@ def refresh_connection_schema(
         db.commit()
         db.refresh(connection)
 
+        # Invalidate SQL cache for this connection so stale queries
+        # generated against the old schema are never replayed.
+        evicted = sql_cache.invalidate_connection(connection_id)
+        if evicted:
+            logger.info(f"SQL cache: evicted {evicted} entries for connection {connection_id} after schema refresh.")
+
         return {
             "status": "success",
             "tables_found": list(schema_snapshot.keys()),
@@ -287,12 +295,16 @@ def _get_user_connection(connection_id: int, user: User, db: Session) -> DbConne
 def _build_db_url(db_type: str, username: str, password: str,
                   host: str, port: str, db_name: str, use_ssl: bool) -> str:
     """Build a SQLAlchemy connection URL."""
-    ssl_param = ""
-    if db_type == "postgres":
+    if db_type in ("postgres", "cockroach"):
         ssl_param = "?sslmode=require" if use_ssl else ""
         return f"postgresql://{username}:{password}@{host}:{port}/{db_name}{ssl_param}"
-    elif db_type == "mysql":
+    elif db_type in ("mysql", "mariadb"):
         ssl_param = "?ssl=true" if use_ssl else ""
         return f"mysql+pymysql://{username}:{password}@{host}:{port}/{db_name}{ssl_param}"
+    elif db_type == "mssql":
+        ssl_param = "?encrypt=true" if use_ssl else ""
+        return f"mssql+pymssql://{username}:{password}@{host}:{port}/{db_name}{ssl_param}"
+    elif db_type == "sqlite":
+        return f"sqlite:///{db_name}"
     else:
         raise ValueError(f"Unsupported database type: {db_type}")

@@ -90,6 +90,11 @@ class SQLRunner:
             f"(Host: {connection_model.host}, max_rows: {max_rows})"
         )
 
+        db_type = connection_model.db_type
+        pg_compat = db_type in ("postgres", "cockroach")
+        # MSSQL uses SAVE TRANSACTION instead of SQL-standard SAVEPOINT
+        use_savepoint = db_type != "mssql"
+
         engine = client_db_manager.get_engine(connection_model)
 
         try:
@@ -98,17 +103,16 @@ class SQLRunner:
                 trans = conn.begin()
 
                 try:
-                    # Set statement timeout
-                    if connection_model.db_type == "postgres":
-                        conn.execute(
-                            text(f"SET statement_timeout = {self.DEFAULT_TIMEOUT_MS};")
-                        )
-                        # Force read-only transaction for extra safety
+                    # Statement timeout + read-only guard
+                    if pg_compat:
+                        conn.execute(text(f"SET statement_timeout = {self.DEFAULT_TIMEOUT_MS};"))
                         conn.execute(text("SET TRANSACTION READ ONLY;"))
+                    elif db_type in ("mysql", "mariadb"):
+                        conn.execute(text(f"SET SESSION MAX_EXECUTION_TIME = {self.DEFAULT_TIMEOUT_MS};"))
 
-                    # Create a SAVEPOINT before execution
-                    conn.execute(text("SAVEPOINT intelliquery_safe;"))
-                    logger.info("📌 SAVEPOINT created.")
+                    if use_savepoint:
+                        conn.execute(text("SAVEPOINT intelliquery_safe;"))
+                        logger.info("📌 SAVEPOINT created.")
 
                     result = conn.execute(text(sql))
                     keys = list(result.keys())
@@ -117,20 +121,20 @@ class SQLRunner:
 
                     logger.info(f"✅ Query Success. Fetched {len(data)} rows.")
 
-                    conn.execute(text("RELEASE SAVEPOINT intelliquery_safe;"))
+                    if use_savepoint:
+                        conn.execute(text("RELEASE SAVEPOINT intelliquery_safe;"))
 
                     trans.rollback()
 
                     return data
 
                 except Exception as e:
-                    try:
-                        conn.execute(
-                            text("ROLLBACK TO SAVEPOINT intelliquery_safe;")
-                        )
-                        logger.info("⏪ Rolled back to SAVEPOINT.")
-                    except Exception:
-                        pass
+                    if use_savepoint:
+                        try:
+                            conn.execute(text("ROLLBACK TO SAVEPOINT intelliquery_safe;"))
+                            logger.info("⏪ Rolled back to SAVEPOINT.")
+                        except Exception:
+                            pass
                     trans.rollback()
                     raise e
 

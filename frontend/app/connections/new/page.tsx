@@ -16,14 +16,14 @@ import Link from "next/link";
 /* ── DB types ─────────────────────────────────────────────── */
 
 const DB_TYPES = [
-  { id: "postgres",  label: "PostgreSQL",  color: "#336791", abbr: "PG" },
-  { id: "mysql",     label: "MySQL",       color: "#e48e00", abbr: "MY" },
-  { id: "sqlite",    label: "SQLite",      color: "#0f80cc", abbr: "SL" },
-  { id: "mariadb",   label: "MariaDB",     color: "#c0765a", abbr: "MD" },
-  { id: "mssql",     label: "SQL Server",  color: "#cc2927", abbr: "MS" },
-  { id: "bigquery",  label: "BigQuery",    color: "#4285f4", abbr: "BQ" },
-  { id: "snowflake", label: "Snowflake",   color: "#29b5e8", abbr: "SF" },
-  { id: "cockroach", label: "CockroachDB", color: "#6933ff", abbr: "CR" },
+  { id: "postgres",  label: "PostgreSQL",  color: "#336791", abbr: "PG", comingSoon: false },
+  { id: "mysql",     label: "MySQL",       color: "#e48e00", abbr: "MY", comingSoon: false },
+  { id: "mariadb",   label: "MariaDB",     color: "#c0765a", abbr: "MD", comingSoon: false },
+  { id: "mssql",     label: "SQL Server",  color: "#cc2927", abbr: "MS", comingSoon: false },
+  { id: "sqlite",    label: "SQLite",      color: "#0f80cc", abbr: "SL", comingSoon: false },
+  { id: "cockroach", label: "CockroachDB", color: "#6933ff", abbr: "CR", comingSoon: false },
+  { id: "snowflake", label: "Snowflake",   color: "#29b5e8", abbr: "SF", comingSoon: true  },
+  { id: "bigquery",  label: "BigQuery",    color: "#4285f4", abbr: "BQ", comingSoon: true  },
 ] as const;
 
 type DbTypeId   = (typeof DB_TYPES)[number]["id"];
@@ -60,6 +60,22 @@ const DEFAULT_PORTS: Record<string, string> = {
   postgres: "5432", mysql: "3306", mariadb: "3306", mssql: "1433",
   sqlite: "", bigquery: "", snowflake: "", cockroach: "26257",
 };
+
+const DEFAULT_USERNAMES: Record<string, string> = {
+  postgres: "postgres", mysql: "root", mariadb: "root",
+  mssql: "sa", cockroach: "root", sqlite: "",
+};
+
+function getUrlPlaceholder(dbType: DbTypeId): string {
+  switch (dbType) {
+    case "postgres":  return "postgresql://user:password@host:5432/dbname";
+    case "cockroach": return "postgresql://user:password@host:26257/defaultdb";
+    case "mysql":     return "mysql://user:password@host:3306/dbname";
+    case "mariadb":   return "mysql://user:password@host:3306/dbname";
+    case "mssql":     return "sqlserver://user:password@host:1433?database=dbname";
+    default:          return `${dbType}://user:password@host:port/dbname`;
+  }
+}
 
 function extractErrorMessage(err: any, fallback: string): string {
   const detail = err?.response?.data?.detail;
@@ -242,11 +258,14 @@ export default function NewConnectionPage() {
         const p = new URL(url);
         let scheme = p.protocol.replace(":", "");
         if (scheme === "postgresql") scheme = "postgres";
-        if (["postgres", "mysql", "mariadb", "mssql"].includes(scheme)) {
+        if (scheme === "cockroachdb") scheme = "cockroach";
+        if (scheme === "sqlserver") scheme = "mssql";
+        if (["postgres", "mysql", "mariadb", "mssql", "cockroach"].includes(scheme)) {
           set({ url, dbType: scheme as DbTypeId, host: p.hostname || form.host,
             port: p.port || DEFAULT_PORTS[scheme], username: p.username || form.username,
-            password: p.password || form.password, dbName: p.pathname.replace("/", "") || form.dbName,
-            useSsl: p.searchParams.get("sslmode") === "require" || form.useSsl });
+            password: p.password || form.password,
+            dbName: (p.pathname.replace("/", "") || p.searchParams.get("database") || form.dbName),
+            useSsl: p.searchParams.get("sslmode") === "require" || p.searchParams.get("encrypt") === "true" || form.useSsl });
         }
       }
     } catch {}
@@ -306,7 +325,7 @@ export default function NewConnectionPage() {
     if (step === 2) return true;
     if (step === 3) {
       if (form.schemaMode === "direct") {
-        /* URL mode populates individual fields via handleUrlChange — validate those */
+        if (form.dbType === "sqlite") return form.dbName.trim() !== "";
         if (form.connMethod === "url") return form.url.trim() !== "" && form.host.trim() !== "" && form.username.trim() !== "";
         return form.host.trim() !== "" && form.username.trim() !== "" && form.dbName.trim() !== "";
       }
@@ -430,11 +449,14 @@ export default function NewConnectionPage() {
                       const isSel = form.dbType === db.id;
                       return (
                         <button key={db.id} type="button"
-                          onClick={() => set({ dbType: db.id, port: DEFAULT_PORTS[db.id] })}
-                          className="relative flex flex-col items-center gap-3 py-6 px-3 rounded-xl border transition-all duration-[100ms]"
-                          style={isSel
-                            ? { background: `${db.color}0e`, borderColor: db.color, boxShadow: `0 0 0 2px ${db.color}35` }
-                            : { background: "var(--ds-base-0)", borderColor: "var(--ds-border-subtle)" }
+                          disabled={db.comingSoon}
+                          onClick={() => !db.comingSoon && set({ dbType: db.id, port: DEFAULT_PORTS[db.id] })}
+                          className="relative flex flex-col items-center gap-3 py-6 px-3 rounded-xl border transition-all duration-[100ms] disabled:cursor-not-allowed"
+                          style={db.comingSoon
+                            ? { background: "var(--ds-base-1)", borderColor: "var(--ds-border-subtle)", opacity: 0.5 }
+                            : isSel
+                              ? { background: `${db.color}0e`, borderColor: db.color, boxShadow: `0 0 0 2px ${db.color}35` }
+                              : { background: "var(--ds-base-0)", borderColor: "var(--ds-border-subtle)" }
                           }
                         >
                           <div className="h-11 w-11 rounded-xl flex items-center justify-center text-[14px] font-bold text-white"
@@ -442,7 +464,13 @@ export default function NewConnectionPage() {
                             {db.abbr}
                           </div>
                           <span className="text-[12px] font-medium text-content-1">{db.label}</span>
-                          {isSel && (
+                          {db.comingSoon && (
+                            <span className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full"
+                              style={{ background: "var(--ds-base-3)", color: "var(--ds-text-3)" }}>
+                              Soon
+                            </span>
+                          )}
+                          {isSel && !db.comingSoon && (
                             <div className="absolute top-2.5 right-2.5 h-5 w-5 rounded-full flex items-center justify-center"
                               style={{ background: db.color }}>
                               <Check className="h-3 w-3 text-white" />
@@ -467,30 +495,41 @@ export default function NewConnectionPage() {
                       <TextInput value={form.name} onChange={v => set({ name: v })}
                         placeholder={`My ${selectedDb?.label ?? "database"}`} />
                     </Field>
-                    <Field label="Where is it hosted?">
-                      <div className="grid grid-cols-3 gap-3">
-                        {([
-                          { id: "cloud",  label: "Cloud",  desc: "AWS, GCP, Azure…", Icon: Cloud  },
-                          { id: "local",  label: "Local",  desc: "Your machine",       Icon: Server },
-                          { id: "docker", label: "Docker", desc: "Container",          Icon: Box    },
-                        ] as const).map(({ id, label, desc, Icon }) => {
-                          const isAct = form.hostType === id;
-                          return (
-                            <button key={id} type="button" onClick={() => set({ hostType: id })}
-                              className="flex flex-col items-center gap-1.5 py-4 rounded-xl border text-center transition-all"
-                              style={isAct
-                                ? { background: "var(--ds-brand-subtle)", borderColor: "var(--ds-accent)", boxShadow: "0 0 0 1px var(--ds-accent)" }
-                                : { background: "var(--ds-base-0)", borderColor: "var(--ds-border-subtle)" }
-                              }
-                            >
-                              <Icon className={["h-5 w-5", isAct ? "text-brand" : "text-content-3"].join(" ")} />
-                              <span className={["text-[13px] font-semibold", isAct ? "text-brand" : "text-content-1"].join(" ")}>{label}</span>
-                              <span className="text-[11px] text-content-3">{desc}</span>
-                            </button>
-                          );
-                        })}
+                    {form.dbType === "sqlite" ? (
+                      <div className="flex items-start gap-3 rounded-xl px-4 py-3.5"
+                        style={{ background: "rgba(15,128,204,0.06)", border: "1px solid rgba(15,128,204,0.18)" }}>
+                        <Database className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: "#0f80cc" }} />
+                        <p className="text-[12px] text-content-3 leading-relaxed">
+                          SQLite is a <strong className="text-content-2">file-based database</strong>. No host or credentials needed — you'll provide the path to the <code className="font-mono">.db</code> file in the next step.
+                        </p>
                       </div>
-                    </Field>
+                    ) : (
+                      <Field label="Where is it hosted?">
+                        <div className="grid grid-cols-3 gap-3">
+                          {([
+                            { id: "cloud",  label: "Cloud",  desc: "AWS, GCP, Azure…", Icon: Cloud,  host: ""          },
+                            { id: "local",  label: "Local",  desc: "Your machine",      Icon: Server, host: "localhost" },
+                            { id: "docker", label: "Docker", desc: "Container",         Icon: Box,    host: "localhost" },
+                          ] as const).map(({ id, label, desc, Icon, host }) => {
+                            const isAct = form.hostType === id;
+                            return (
+                              <button key={id} type="button"
+                                onClick={() => set({ hostType: id, ...(host ? { host } : {}) })}
+                                className="flex flex-col items-center gap-1.5 py-4 rounded-xl border text-center transition-all"
+                                style={isAct
+                                  ? { background: "var(--ds-brand-subtle)", borderColor: "var(--ds-accent)", boxShadow: "0 0 0 1px var(--ds-accent)" }
+                                  : { background: "var(--ds-base-0)", borderColor: "var(--ds-border-subtle)" }
+                                }
+                              >
+                                <Icon className={["h-5 w-5", isAct ? "text-brand" : "text-content-3"].join(" ")} />
+                                <span className={["text-[13px] font-semibold", isAct ? "text-brand" : "text-content-1"].join(" ")}>{label}</span>
+                                <span className="text-[11px] text-content-3">{desc}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </Field>
+                    )}
                   </div>
                 </>
               )}
@@ -592,60 +631,74 @@ export default function NewConnectionPage() {
                         </p>
                       </div>
 
-                      {/* URL / Manual toggle */}
-                      <div className="flex rounded-xl overflow-hidden border border-border">
-                        {([
-                          { id: "url",    label: "Connection URL", Icon: Link2   },
-                          { id: "manual", label: "Manual config",  Icon: Sliders },
-                        ] as const).map(({ id, label, Icon }) => {
-                          const isAct = form.connMethod === id;
-                          return (
-                            <button key={id} type="button" onClick={() => set({ connMethod: id })}
-                              className="flex-1 flex items-center justify-center gap-2 py-2.5 text-[13px] font-medium transition-colors"
-                              style={isAct
-                                ? { background: "var(--ds-accent)", color: "white" }
-                                : { background: "var(--ds-base-1)", color: "var(--ds-text-3)" }
-                              }
-                            >
-                              <Icon className="h-4 w-4" />{label}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {form.connMethod === "url" ? (
-                        <Field label="Connection URL" hint="Paste your full connection string — host, port, and credentials are parsed automatically.">
-                          <TextInput value={form.url} onChange={handleUrlChange}
-                            placeholder={`${form.dbType === "postgres" ? "postgresql" : form.dbType}://user:password@host:port/dbname`} />
+                      {/* SQLite: only needs a file path */}
+                      {form.dbType === "sqlite" && (
+                        <Field label="Database file path" hint="Absolute path to the .db or .sqlite file on the server (e.g. /data/myapp.db).">
+                          <TextInput value={form.dbName} onChange={v => set({ dbName: v })} placeholder="/data/myapp.db" />
                         </Field>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-3 gap-3">
-                            <div className="col-span-2">
-                              <Field label="Host">
-                                <TextInput value={form.host} onChange={v => set({ host: v })} placeholder="db.example.com" />
-                              </Field>
-                            </div>
-                            <Field label="Port">
-                              <TextInput value={form.port} onChange={v => set({ port: v })} placeholder="5432" />
-                            </Field>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <Field label="Username">
-                              <TextInput value={form.username} onChange={v => set({ username: v })} placeholder="postgres" />
-                            </Field>
-                            <Field label="Password">
-                              <TextInput value={form.password} onChange={v => set({ password: v })} type="password" />
-                            </Field>
-                          </div>
-                          <Field label="Database name">
-                            <TextInput value={form.dbName} onChange={v => set({ dbName: v })} placeholder="my_database" />
-                          </Field>
-                        </div>
                       )}
 
-                      <Checkbox checked={form.useSsl} onChange={() => set({ useSsl: !form.useSsl })}
-                        label="Use SSL / TLS (required for most cloud databases)" />
+                      {/* URL / Manual toggle + credential fields (non-SQLite) */}
+                      {form.dbType !== "sqlite" && (
+                        <>
+                          <div className="flex rounded-xl overflow-hidden border border-border">
+                            {([
+                              { id: "url",    label: "Connection URL", Icon: Link2   },
+                              { id: "manual", label: "Manual config",  Icon: Sliders },
+                            ] as const).map(({ id, label, Icon }) => {
+                              const isAct = form.connMethod === id;
+                              return (
+                                <button key={id} type="button" onClick={() => set({ connMethod: id })}
+                                  className="flex-1 flex items-center justify-center gap-2 py-2.5 text-[13px] font-medium transition-colors"
+                                  style={isAct
+                                    ? { background: "var(--ds-accent)", color: "white" }
+                                    : { background: "var(--ds-base-1)", color: "var(--ds-text-3)" }
+                                  }
+                                >
+                                  <Icon className="h-4 w-4" />{label}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {form.connMethod === "url" ? (
+                            <Field label="Connection URL" hint="Paste your full connection string — host, port, and credentials are parsed automatically.">
+                              <TextInput value={form.url} onChange={handleUrlChange}
+                                placeholder={getUrlPlaceholder(form.dbType)} />
+                            </Field>
+                          ) : (
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-3 gap-3">
+                                <div className="col-span-2">
+                                  <Field label="Host"
+                                    hint={form.hostType === "docker" ? "Use the container/service name if both are in Docker" : undefined}>
+                                    <TextInput value={form.host} onChange={v => set({ host: v })}
+                                      placeholder={form.hostType === "cloud" ? "db.example.com" : "localhost"} />
+                                  </Field>
+                                </div>
+                                <Field label="Port">
+                                  <TextInput value={form.port} onChange={v => set({ port: v })} placeholder={DEFAULT_PORTS[form.dbType] || "5432"} />
+                                </Field>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <Field label="Username">
+                                  <TextInput value={form.username} onChange={v => set({ username: v })}
+                                    placeholder={DEFAULT_USERNAMES[form.dbType] || "user"} />
+                                </Field>
+                                <Field label="Password">
+                                  <TextInput value={form.password} onChange={v => set({ password: v })} type="password" />
+                                </Field>
+                              </div>
+                              <Field label="Database name">
+                                <TextInput value={form.dbName} onChange={v => set({ dbName: v })} placeholder="my_database" />
+                              </Field>
+                            </div>
+                          )}
+
+                          <Checkbox checked={form.useSsl} onChange={() => set({ useSsl: !form.useSsl })}
+                            label="Use SSL / TLS (required for most cloud databases)" />
+                        </>
+                      )}
 
                       {schemaError && (
                         <div className="flex items-start gap-3 rounded-xl px-4 py-3 text-[13px]"
