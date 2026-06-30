@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import {
   User, Building2, Users, Shield, Mail, Copy, Check,
-  Loader2, AlertCircle, CheckCircle2, XCircle, ArrowLeft, Pencil, LogOut,
+  Loader2, AlertCircle, ArrowLeft, Pencil, LogOut,
 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -26,9 +26,6 @@ import {
   updateOrganization,
   getTeamMembers,
   inviteTeamMember,
-  getMyInvites,
-  acceptInvite,
-  declineInvite,
 } from '@/lib/api';
 
 export default function SettingsPage() {
@@ -150,8 +147,6 @@ function SettingsContent() {
         <main className="flex-1 overflow-y-auto custom-scrollbar px-6 py-8 sm:px-10 sm:pt-8">
           <div className="max-w-3xl mx-auto space-y-6">
 
-            <PendingInvitesBanner />
-
             {activeTab === 'profile'      && <ProfileTab user={user} />}
             {activeTab === 'organization' && <OrgTab existingOrg={org} setExistingOrg={setOrg} />}
             {activeTab === 'team'         && <TeamTab orgSlug={org?.slug as string | undefined} />}
@@ -172,116 +167,6 @@ function Section({ title, description, children }: { title: string; description?
         {description && <p className="mt-0.5 text-[13px] text-content-3">{description}</p>}
       </div>
       <div className="p-7">{children}</div>
-    </div>
-  );
-}
-
-/* ── Pending invites ─────────────────────────────────────── */
-
-interface Invite {
-  id: number;
-  org_name: string;
-  org_slug: string;
-  inviter_name: string;
-  inviter_email: string;
-  role: string;
-  created_at: string | null;
-}
-
-function PendingInvitesBanner() {
-  const [invites, setInvites] = useState<Invite[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-
-  const fetchInvites = useCallback(async () => {
-    try {
-      const data = await getMyInvites();
-      setInvites(data.invites || []);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { fetchInvites(); }, [fetchInvites]);
-
-  const handleAccept = async (id: number) => {
-    setActionLoading(id); setMsg(null);
-    try {
-      const data = await acceptInvite(id);
-      setMsg({ text: data.message, type: 'success' });
-      setInvites(prev => prev.filter(i => i.id !== id));
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      setMsg({ text: e.response?.data?.detail || 'Failed to accept invite.', type: 'error' });
-    } finally { setActionLoading(null); }
-  };
-
-  const handleDecline = async (id: number) => {
-    setActionLoading(id); setMsg(null);
-    try {
-      const data = await declineInvite(id);
-      setMsg({ text: data.message, type: 'success' });
-      setInvites(prev => prev.filter(i => i.id !== id));
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      setMsg({ text: e.response?.data?.detail || 'Failed to decline invite.', type: 'error' });
-    } finally { setActionLoading(null); }
-  };
-
-  if (loading || (invites.length === 0 && !msg)) return null;
-
-  return (
-    <div className="space-y-2">
-      {msg && <StatusMessage message={msg.text} type={msg.type} />}
-      {invites.map(invite => (
-        <div
-          key={invite.id}
-          className="flex flex-wrap items-center justify-between gap-4 rounded-xl border px-4 py-3.5"
-          style={{
-            background: 'var(--ds-base-1)',
-            border: '1px solid var(--ds-border-moderate)',
-            boxShadow: 'var(--ds-shadow-sm)',
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="h-9 w-9 rounded-lg border border-border flex items-center justify-center flex-shrink-0"
-              style={{ background: 'var(--ds-base-0)' }}
-            >
-              <Mail className="h-4 w-4 text-content-3" />
-            </div>
-            <div>
-              <p className="text-[13px] text-content-1">
-                <span className="font-semibold">{invite.inviter_name || invite.inviter_email}</span>
-                {' '}invited you to join{' '}
-                <span className="font-semibold">{invite.org_name}</span>
-              </p>
-              <p className="text-[12px] text-content-3 mt-0.5 capitalize">Role: {invite.role}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 gap-1.5 text-[13px] text-error hover:bg-[var(--ds-error-muted)] hover:text-error"
-              onClick={() => handleDecline(invite.id)}
-              disabled={actionLoading === invite.id}
-            >
-              {actionLoading === invite.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
-              Decline
-            </Button>
-            <Button
-              size="sm"
-              className="h-8 gap-1.5 text-[13px]"
-              onClick={() => handleAccept(invite.id)}
-              disabled={actionLoading === invite.id}
-            >
-              {actionLoading === invite.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-              Accept
-            </Button>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

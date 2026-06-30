@@ -14,6 +14,9 @@ import {
   Bug,
   Sun,
   Moon,
+  Loader2,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Sidebar } from './Sidebar';
@@ -21,7 +24,16 @@ import Link from 'next/link';
 import { useSession } from '@/lib/use-auth';
 import { authClient } from '@/lib/auth-client';
 import { useTheme } from '@/components/Providers/ThemeProvider';
-import { getOrganization } from '@/lib/api';
+import { getOrganization, getMyInvites, acceptInvite, declineInvite } from '@/lib/api';
+
+interface Invite {
+  id: number;
+  org_name: string;
+  inviter_name: string;
+  inviter_email: string;
+  role: string;
+  created_at: string | null;
+}
 
 type View = 'chat' | 'schema' | 'snippets' | 'history';
 
@@ -35,10 +47,12 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
   const { theme, setTheme } = useTheme();
   const isDark = theme === 'dark';
 
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [notifOpen, setNotifOpen]     = useState(false);
-  const [helpOpen, setHelpOpen]       = useState(false);
-  const [orgName, setOrgName]         = useState<string | null>(null);
+  const [profileOpen, setProfileOpen]   = useState(false);
+  const [notifOpen, setNotifOpen]       = useState(false);
+  const [helpOpen, setHelpOpen]         = useState(false);
+  const [orgName, setOrgName]           = useState<string | null>(null);
+  const [invites, setInvites]           = useState<Invite[]>([]);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef   = useRef<HTMLDivElement>(null);
@@ -50,7 +64,26 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
   useEffect(() => {
     if (!user) return;
     getOrganization().then((data) => setOrgName(data?.org?.name ?? null)).catch(() => {});
+    getMyInvites().then((data) => setInvites(data.invites || [])).catch(() => {});
   }, [user]);
+
+  const handleAccept = async (id: number) => {
+    setActionLoading(id);
+    try {
+      await acceptInvite(id);
+      setInvites(prev => prev.filter(i => i.id !== id));
+    } catch {}
+    setActionLoading(null);
+  };
+
+  const handleDecline = async (id: number) => {
+    setActionLoading(id);
+    try {
+      await declineInvite(id);
+      setInvites(prev => prev.filter(i => i.id !== id));
+    } catch {}
+    setActionLoading(null);
+  };
 
   /* Close all dropdowns on outside click */
   useEffect(() => {
@@ -182,46 +215,82 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
           <IconBtn label="Notifications" active={notifOpen} onClick={() => { closeAll(); setNotifOpen(!notifOpen); }}>
             <div className="relative">
               <Bell className="h-4 w-4" />
-              <span
-                className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full"
-                style={{ background: 'var(--ds-accent)' }}
-                aria-hidden
-              />
+              {invites.length > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white"
+                  style={{ background: 'var(--ds-accent)' }}
+                  aria-hidden
+                >
+                  {invites.length}
+                </span>
+              )}
             </div>
           </IconBtn>
           {notifOpen && (
             <div
-              className="absolute right-0 top-full mt-1.5 w-72 rounded-xl z-50 overflow-hidden"
+              className="absolute right-0 top-full mt-1.5 w-80 rounded-xl z-50 overflow-hidden"
               style={dropdownStyle}
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <p className="text-[13px] font-semibold text-content-1">Notifications</p>
-                <span
-                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white"
-                  style={{ background: 'var(--ds-accent)' }}
-                >
-                  1 new
-                </span>
+                {invites.length > 0 && (
+                  <span
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white"
+                    style={{ background: 'var(--ds-accent)' }}
+                  >
+                    {invites.length} new
+                  </span>
+                )}
               </div>
-              <div className="py-1">
-                <div className="px-4 py-3 hover:bg-base-1 transition-colors cursor-pointer">
-                  <div className="flex items-start gap-3">
-                    <span className="h-2 w-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'var(--ds-accent)' }} />
-                    <div>
-                      <p className="text-[12px] font-medium text-content-1">Welcome to Intelliquery</p>
-                      <p className="text-[11px] text-content-3 mt-0.5">
-                        Connect a database and run your first natural language query.
-                      </p>
-                      <p className="text-[10px] text-content-3 mt-1.5 font-mono">Just now</p>
+
+              {invites.length > 0 ? (
+                <div className="divide-y divide-border max-h-80 overflow-y-auto">
+                  {invites.map(invite => (
+                    <div key={invite.id} className="px-4 py-3.5">
+                      <div className="flex items-start gap-2.5 mb-2.5">
+                        <span className="h-1.5 w-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'var(--ds-accent)' }} />
+                        <div className="min-w-0">
+                          <p className="text-[12.5px] text-content-1 leading-snug">
+                            <span className="font-semibold">{invite.inviter_name || invite.inviter_email}</span>
+                            {' '}invited you to join{' '}
+                            <span className="font-semibold">{invite.org_name}</span>
+                          </p>
+                          <p className="text-[11px] text-content-3 mt-0.5 capitalize">Role: {invite.role}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pl-4">
+                        <button
+                          onClick={() => handleDecline(invite.id)}
+                          disabled={actionLoading === invite.id}
+                          className="flex items-center gap-1 px-3 py-1 rounded-md text-[12px] border transition-colors disabled:opacity-50"
+                          style={{ borderColor: 'var(--ds-border-moderate)', color: 'var(--ds-text-2)' }}
+                        >
+                          {actionLoading === invite.id
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <XCircle className="h-3 w-3" />}
+                          Decline
+                        </button>
+                        <button
+                          onClick={() => handleAccept(invite.id)}
+                          disabled={actionLoading === invite.id}
+                          className="flex items-center gap-1 px-3 py-1 rounded-md text-[12px] text-white transition-colors disabled:opacity-50"
+                          style={{ background: 'var(--ds-accent)' }}
+                        >
+                          {actionLoading === invite.id
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <CheckCircle2 className="h-3 w-3" />}
+                          Accept
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              </div>
-              <div className="border-t border-border">
-                <button className="w-full px-4 py-2.5 text-[12px] text-content-3 hover:text-content-1 hover:bg-base-1 transition-colors">
-                  View all
-                </button>
-              </div>
+              ) : (
+                <div className="px-4 py-8 text-center">
+                  <Bell className="h-8 w-8 text-content-3 mx-auto mb-2 opacity-40" />
+                  <p className="text-[13px] text-content-3">No new notifications</p>
+                </div>
+              )}
             </div>
           )}
         </div>
