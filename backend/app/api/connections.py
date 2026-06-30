@@ -20,13 +20,15 @@ mapper = SchemaMapper()
 
 class ConnectionCreate(BaseModel):
     name: str
-    db_type: str  # "postgres" | "mysql"
+    db_type: str
     host: str
     port: str
     username: str
     password: str
     db_name: str
     use_ssl: bool = False
+    excluded_tables: List[str] = []
+    excluded_columns: dict = {}  # {table_name: [col_name, ...]}
 
 
 class ConnectionTest(BaseModel):
@@ -51,11 +53,11 @@ def test_connection(
     current_user: User = Depends(require_viewer),
 ):
     """
-    Test a database connection without saving it.
-    Returns success/failure and the list of tables found.
+    Test a database connection and return schema without saving.
+    Returns {status, schema: {table: {col: {type, nullable, is_pk, fk_target}}}}.
     """
     try:
-        from sqlalchemy import create_engine, text
+        from sqlalchemy import create_engine, text, inspect as sa_inspect
 
         db_url = _build_db_url(
             conn_data.db_type, conn_data.username, conn_data.password,
@@ -63,11 +65,32 @@ def test_connection(
         )
         engine = create_engine(db_url, connect_args={"connect_timeout": 10})
 
+        schema_snapshot = {}
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
+            inspector = sa_inspect(engine)
+            for table_name in inspector.get_table_names():
+                pk_cols = set(inspector.get_pk_constraint(table_name).get("constrained_columns", []))
+                fk_lookup = {}
+                for fk in inspector.get_foreign_keys(table_name):
+                    if fk["constrained_columns"] and fk["referred_columns"]:
+                        fk_lookup[fk["constrained_columns"][0]] = (
+                            f"{fk['referred_table']}.{fk['referred_columns'][0]}"
+                        )
+                columns_map = {}
+                for col in inspector.get_columns(table_name):
+                    col_name = col["name"]
+                    columns_map[col_name] = {
+                        "type": str(col["type"]).lower(),
+                        "nullable": col.get("nullable", True),
+                        "is_pk": col_name in pk_cols,
+                        "fk_target": fk_lookup.get(col_name),
+                    }
+                schema_snapshot[table_name] = columns_map
 
-        logger.info(f"Connection test succeeded for {conn_data.host}")
-        return {"status": "success", "message": "Connection successful!"}
+        engine.dispose()
+        logger.info(f"Connection test succeeded for {conn_data.host} ({len(schema_snapshot)} tables)")
+        return {"status": "success", "schema": schema_snapshot}
 
     except Exception as e:
         logger.error(f"Connection test failed: {e}")
@@ -104,6 +127,14 @@ def create_connection(
 
         logger.info(f"Analyzing schema for {conn_data.host}...")
         schema_snapshot = mapper.sync_schema(new_conn)
+
+        # Apply user exclusions from the review step
+        for tbl in conn_data.excluded_tables:
+            schema_snapshot.pop(tbl, None)
+        for tbl, cols in conn_data.excluded_columns.items():
+            if tbl in schema_snapshot:
+                for col in cols:
+                    schema_snapshot[tbl].pop(col, None)
 
         new_conn.cached_schema = schema_snapshot
 

@@ -27,6 +27,7 @@ import {
   TrendingUp,
   AlertTriangle,
   X,
+  PlusCircle
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
@@ -400,7 +401,7 @@ function WelcomeScreen({
           </div>
           <Link href="/connections/new">
             <Button size="sm" className="gap-2">
-              <Database className="h-3.5 w-3.5" />
+              <PlusCircle className="h-3.5 w-3.5" />
               Add Database
             </Button>
           </Link>

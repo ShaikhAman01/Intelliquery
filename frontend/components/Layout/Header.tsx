@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { useSession } from '@/lib/use-auth';
 import { authClient } from '@/lib/auth-client';
 import { useTheme } from '@/components/Providers/ThemeProvider';
+import { getOrganization } from '@/lib/api';
 
 type View = 'chat' | 'schema' | 'snippets' | 'history';
 
@@ -37,6 +38,7 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen]     = useState(false);
   const [helpOpen, setHelpOpen]       = useState(false);
+  const [orgName, setOrgName]         = useState<string | null>(null);
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef   = useRef<HTMLDivElement>(null);
@@ -44,6 +46,11 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
 
   const avatarInitial = (user?.name || user?.email || 'U')[0].toUpperCase();
   const displayName   = user?.name || user?.email?.split('@')[0] || 'Account';
+
+  useEffect(() => {
+    if (!user) return;
+    getOrganization().then((data) => setOrgName(data?.org?.name ?? null)).catch(() => {});
+  }, [user]);
 
   /* Close all dropdowns on outside click */
   useEffect(() => {
@@ -245,8 +252,8 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
               }
             </div>
             <div className="hidden sm:block text-left">
-              <p className="text-[14px] font-semibold text-content-1 leading-tight">{displayName}</p>
-              <p className="text-[12px] text-content-3 leading-tight">Personal</p>
+              <p className="text-[13px] font-semibold text-content-1 leading-tight">{displayName}</p>
+              {orgName && <p className="text-[11px] text-content-3 leading-tight truncate max-w-[120px]">{orgName}</p>}
             </div>
             <ChevronDown
               className={[

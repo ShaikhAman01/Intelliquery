@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChartPanel } from '@/components/Chat/Visualizer';
 import { SQLDisplay } from '@/components/Query/SQLDisplay';
 import { ResultsTable } from '@/components/Chat/ResultsTable';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Download,
   AlertTriangle,
@@ -212,6 +212,16 @@ export function InsightsView({ sql, explanation, data, chartRec, executionTime }
   const [xKey, setXKey] = useState<string>(stringCols[0] || allCols[0] || '');
   const [yKey, setYKey] = useState<string>(numericCols[0] || allCols[1] || '');
   const [chartFullscreen, setChartFullscreen] = useState(false);
+  const [mainEl, setMainEl] = useState<Element | null>(null);
+
+  useEffect(() => { setMainEl(document.querySelector('main')); }, []);
+
+  useEffect(() => {
+    if (!chartFullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setChartFullscreen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [chartFullscreen]);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const downloadChart = () => {
@@ -502,71 +512,67 @@ export function InsightsView({ sql, explanation, data, chartRec, executionTime }
             </div>
           </div>
 
-          {/* Fullscreen dialog */}
-          <Dialog open={chartFullscreen} onOpenChange={setChartFullscreen}>
-            <DialogContent
-              showCloseButton={false}
-              className="top-0 left-0 translate-x-0 translate-y-0 max-w-none w-screen h-screen rounded-none border-0 p-0 overflow-hidden"
+          {/* Fullscreen — portal into <main> so sidebar stays visible */}
+          {chartFullscreen && mainEl && createPortal(
+            <div
+              className="absolute inset-0 z-50 flex flex-col"
               style={{ background: 'var(--ds-base-0)' }}
             >
-              <DialogHeader className="sr-only">
-                <DialogTitle>Chart — Fullscreen</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col h-full">
-                {/* Fullscreen header */}
-                <div
-                  className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-border"
-                  style={{ background: 'var(--ds-base-1)' }}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-[14px] font-semibold text-content-1">Chart</span>
-                    <span className="text-[12px] text-content-3">
-                      {data.length.toLocaleString()} rows · {allCols.length} columns
+              {/* Header */}
+              <div
+                className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-border"
+                style={{ background: 'var(--ds-base-1)' }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-[14px] font-semibold text-content-1 flex-shrink-0">Chart</span>
+                  <span className="text-[12px] text-content-3 flex-shrink-0">
+                    <strong className="text-content-1 font-semibold">{data.length.toLocaleString()}</strong> rows ·{' '}
+                    <strong className="text-content-1 font-semibold">{allCols.length}</strong> columns
+                  </span>
+                  {chartRec?.reason && (
+                    <span className="text-[12px] text-content-3 truncate hidden md:block">
+                      <span className="text-brand mr-1">✦</span>{chartRec.reason}
                     </span>
-                    {chartRec?.reason && (
-                      <span className="text-[12px] text-content-3 hidden md:block">
-                        <span className="text-brand mr-1">✦</span>{chartRec.reason}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const canvas = document.querySelector('[data-chart-fullscreen] canvas') as HTMLCanvasElement | null;
-                        if (!canvas) return;
-                        const url = canvas.toDataURL('image/png', 1.0);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'intelliquery_chart.png';
-                        a.click();
-                      }}
-                      className="h-8 gap-1.5 px-3 text-[12px]"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Download PNG
-                    </Button>
-                    <button
-                      onClick={() => setChartFullscreen(false)}
-                      className="h-8 w-8 flex items-center justify-center rounded-lg text-content-3 hover:bg-base-3 hover:text-content-1 transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
+                  )}
                 </div>
-                {/* Fullscreen chart body */}
-                <div data-chart-fullscreen className="flex-1 min-h-0 p-8">
-                  <ChartPanel
-                    data={data}
-                    chartRecommendation={chartRec}
-                    xKey={xKey || undefined}
-                    yKeys={yKey ? [yKey] : undefined}
-                  />
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const canvas = document.querySelector('[data-chart-fullscreen] canvas') as HTMLCanvasElement | null;
+                      if (!canvas) return;
+                      const url = canvas.toDataURL('image/png', 1.0);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'intelliquery_chart.png';
+                      a.click();
+                    }}
+                    className="h-8 gap-1.5 px-3 text-[12px]"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download PNG
+                  </Button>
+                  <button
+                    onClick={() => setChartFullscreen(false)}
+                    className="h-8 w-8 flex items-center justify-center rounded-lg text-content-3 hover:bg-base-3 hover:text-content-1 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
-            </DialogContent>
-          </Dialog>
+              {/* Chart — fills all remaining height */}
+              <div data-chart-fullscreen className="flex-1 min-h-0 p-8">
+                <ChartPanel
+                  data={data}
+                  chartRecommendation={chartRec}
+                  xKey={xKey || undefined}
+                  yKeys={yKey ? [yKey] : undefined}
+                />
+              </div>
+            </div>,
+            mainEl
+          )}
         </div>
       )}
 

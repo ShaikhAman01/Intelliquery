@@ -14,15 +14,14 @@ import { Button } from "@/components/ui/button";
 import {
   Loader2,
   Database,
-  Compass,
   Bookmark,
   Clock,
   Search,
-  ChevronRight,
   Play,
   Trash2,
   FileSearch,
-  MoreHorizontal,
+  Copy,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -79,6 +78,19 @@ function AppShell() {
 
 /* ── Schema Explorer ──────────────────────────────────────── */
 
+function schemaTypeStyle(type: string) {
+  const t = (type || "").toLowerCase();
+  if (/int|numeric|float|decimal|double|real|serial|bigint|smallint|number/.test(t))
+    return { background: "rgba(37,99,235,0.08)", color: "#2563eb", border: "1px solid rgba(37,99,235,0.2)" };
+  if (/char|text|varchar|string|uuid|json|xml/.test(t))
+    return { background: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.2)" };
+  if (/date|time|timestamp/.test(t))
+    return { background: "rgba(5,150,105,0.08)", color: "#059669", border: "1px solid rgba(5,150,105,0.2)" };
+  if (/bool/.test(t))
+    return { background: "rgba(217,119,6,0.08)", color: "#d97706", border: "1px solid rgba(217,119,6,0.2)" };
+  return { background: "var(--ds-base-3)", color: "var(--ds-text-3)", border: "1px solid var(--ds-border-subtle)" };
+}
+
 function SchemaView() {
   const { activeConnectionId } = useStore();
   const { toast } = useToast();
@@ -90,112 +102,187 @@ function SchemaView() {
   useEffect(() => {
     if (!activeConnectionId) return;
     setLoading(true);
+    setSelected(null);
     getSchema(activeConnectionId)
       .then((res) => setTables(res.tables || res))
       .catch(() => toast("Failed to load schema.", "error"))
       .finally(() => setLoading(false));
   }, [activeConnectionId, toast]);
 
+  const tableNames = useMemo(() => Object.keys(tables), [tables]);
   const filtered = useMemo(
-    () => Object.keys(tables).filter((t) => !search || t.toLowerCase().includes(search.toLowerCase())),
-    [tables, search]
+    () => tableNames.filter((t) => !search || t.toLowerCase().includes(search.toLowerCase())),
+    [tableNames, search]
   );
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex-shrink-0 border-b border-border px-6 py-4" style={{ background: "var(--ds-base-1)" }}>
-        <div className="flex items-center gap-3">
-          <Compass className="h-5 w-5 text-content-3" />
-          <div>
-            <h2 className="text-[14px] font-semibold text-content-1">Schema Explorer</h2>
-            <p className="text-[12px] text-content-3 mt-0.5">Browse tables, columns, and relationships.</p>
+    <div className="flex h-full overflow-hidden">
+      {/* ── Left: table list ── */}
+      <div className="w-64 flex-shrink-0 border-r border-border flex flex-col overflow-hidden" style={{ background: "var(--ds-base-1)" }}>
+        <div className="flex-shrink-0 px-4 py-3.5 border-b border-border space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-content-3">Tables</span>
+            {tableNames.length > 0 && (
+              <span className="text-[11px] text-content-3">{filtered.length} / {tableNames.length}</span>
+            )}
           </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-content-3 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter tables…"
+              className="w-full h-8 pl-8 pr-3 rounded-lg text-[12px] text-content-1 placeholder:text-content-3 outline-none"
+              style={{ background: "var(--ds-base-0)", border: "1px solid var(--ds-border-subtle)", boxShadow: "var(--ds-shadow-inset)" }}
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-4 w-4 animate-spin text-content-3" />
+            </div>
+          ) : !activeConnectionId ? (
+            <p className="text-[12px] text-content-3 px-3 py-3">No database connected.</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-[12px] text-content-3 px-3 py-3">{search ? "No matching tables." : "No tables found."}</p>
+          ) : (
+            filtered.map((tbl) => {
+              const colCount = Object.keys(tables[tbl] || {}).length;
+              const isActive = selected === tbl;
+              return (
+                <button
+                  key={tbl}
+                  onClick={() => setSelected(tbl)}
+                  className={[
+                    "w-full text-left px-3 py-2 rounded-lg flex items-center justify-between gap-2 transition-colors",
+                    isActive ? "bg-brand-subtle" : "hover:bg-base-2",
+                  ].join(" ")}
+                >
+                  <span className={["font-mono text-[12px] truncate", isActive ? "text-brand font-semibold" : "text-content-1"].join(" ")}>
+                    {tbl}
+                  </span>
+                  <span
+                    className="flex-shrink-0 text-[10px] font-medium tabular-nums px-1.5 py-0.5 rounded"
+                    style={{ background: isActive ? "var(--ds-base-0)" : "var(--ds-base-3)", color: "var(--ds-text-3)" }}
+                  >
+                    {colCount}
+                  </span>
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
 
-      {!activeConnectionId ? (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState icon={Database} title="No database connected" description="Connect a database to explore its schema."
-            action={<Link href="/connections/new"><Button size="sm">Add Database</Button></Link>} />
-        </div>
-      ) : loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-content-3" />
-        </div>
-      ) : (
-        <div className="flex-1 min-h-0 flex overflow-hidden">
-          {/* Table list */}
-          <div className="w-56 flex-shrink-0 border-r border-border flex flex-col overflow-hidden" style={{ background: "var(--ds-base-1)" }}>
-            <div className="p-3 border-b border-border">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-content-3 pointer-events-none" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filter tables…"
-                  className="w-full h-8 pl-8 pr-3 rounded-lg text-[12px] text-content-1 placeholder:text-content-3 outline-none"
-                  style={{ background: "var(--ds-base-0)", border: "1px solid var(--ds-border-subtle)", boxShadow: "var(--ds-shadow-inset)" }} />
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-              {filtered.length === 0 ? (
-                <p className="text-[12px] text-content-3 px-3 py-2">No tables found.</p>
-              ) : (
-                filtered.map((tbl) => (
-                  <button key={tbl} onClick={() => setSelected(tbl)}
-                    className={["w-full text-left px-3 py-2 text-[12px] rounded-lg flex items-center justify-between gap-2 transition-colors",
-                      selected === tbl ? "bg-brand-subtle text-brand font-medium" : "text-content-2 hover:text-content-1 hover:bg-base-2",
-                    ].join(" ")}>
-                    <span className="font-mono truncate">{tbl}</span>
-                    <ChevronRight className="h-3 w-3 text-content-3 flex-shrink-0" />
-                  </button>
-                ))
-              )}
-            </div>
+      {/* ── Right: column detail ── */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {!activeConnectionId ? (
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState icon={Database} title="No database connected" description="Connect a database to explore its schema."
+              action={<Link href="/connections/new"><Button size="sm">Add Database</Button></Link>} />
           </div>
-
-          {/* Column detail */}
-          <div className="flex-1 min-w-0 overflow-y-auto custom-scrollbar p-6">
-            {selected && tables[selected] ? (
+        ) : selected && tables[selected] ? (
+          <>
+            {/* Detail header */}
+            <div
+              className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border"
+              style={{ background: "var(--ds-base-1)" }}
+            >
               <div>
-                <div className="mb-5">
-                  <h3 className="text-[15px] font-semibold text-content-1 font-mono">{selected}</h3>
-                  <p className="text-[12px] text-content-3 mt-0.5">{Object.keys(tables[selected]).length} columns</p>
-                </div>
-                <div className="rounded-xl border border-border overflow-hidden" style={{ boxShadow: "var(--ds-shadow-sm)" }}>
-                  <table className="w-full text-left text-[12px] border-collapse">
-                    <thead>
-                      <tr className="text-content-3 font-semibold select-none"
-                        style={{ background: "var(--ds-base-2)", borderBottom: "1px solid var(--ds-border-subtle)" }}>
-                        {["Column", "Type", "Constraints", "Nullable"].map((h) => (
-                          <th key={h} className="px-4 py-3">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--ds-border-subtle)]">
-                      {Object.entries(tables[selected]).map(([col, meta]: [string, any]) => (
-                        <tr key={col} className="hover:bg-base-1 transition-colors">
-                          <td className="px-4 py-2.5 font-mono font-semibold text-content-1">{col}</td>
-                          <td className="px-4 py-2.5 font-mono text-content-3">{meta.type || meta}</td>
-                          <td className="px-4 py-2.5 space-x-1">
-                            {meta.is_pk && <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold"
-                              style={{ background: "var(--ds-warning-muted)", color: "var(--ds-warning)", border: "1px solid var(--ds-warning-border)" }}>PK</span>}
-                            {meta.fk_target && <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold"
-                              style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.18)" }}>FK</span>}
-                            {!meta.is_pk && !meta.fk_target && <span className="text-content-3">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-[11px] font-mono text-content-3">
-                            {meta.nullable === false ? "NOT NULL" : "NULLABLE"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <h3 className="text-[15px] font-semibold font-mono text-content-1">{selected}</h3>
+                <p className="text-[12px] text-content-3 mt-0.5">{Object.keys(tables[selected]).length} columns</p>
               </div>
-            ) : (
-              <EmptyState icon={FileSearch} title="Select a table" description="Click a table on the left to view its columns." />
-            )}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => { navigator.clipboard.writeText(selected); toast("Copied table name", "success"); }}
+                  className="h-7 gap-1.5 px-2.5 text-[11px]"
+                >
+                  <Copy className="h-3 w-3" />
+                  Copy name
+                </Button>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => { navigator.clipboard.writeText(`SELECT * FROM "${selected}" LIMIT 100;`); toast("Copied SELECT", "success"); }}
+                  className="h-7 gap-1.5 px-2.5 text-[11px]"
+                >
+                  <Copy className="h-3 w-3" />
+                  Copy SELECT
+                </Button>
+              </div>
+            </div>
+
+            {/* Column table */}
+            <div className="flex-1 min-h-0 overflow-auto custom-scrollbar">
+              <table className="w-full text-left text-[12px] border-collapse">
+                <thead className="sticky top-0 z-10">
+                  <tr style={{ background: "var(--ds-base-2)", borderBottom: "1px solid var(--ds-border-subtle)" }}>
+                    {["Column", "Type", "Key / Reference", "Nullable"].map((h) => (
+                      <th key={h} className="px-4 py-2.5 text-[11px] font-semibold text-content-3 whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(tables[selected]).map(([col, meta]: [string, any]) => {
+                    const typeStr = typeof meta === "string" ? meta : (meta.type || "");
+                    const typeStyle = schemaTypeStyle(typeStr);
+                    const isPk = meta.is_pk;
+                    const fkTarget = meta.fk_target;
+                    const isNotNull = meta.nullable === false;
+                    return (
+                      <tr key={col} className="hover:bg-base-1 transition-colors border-b border-[var(--ds-border-subtle)]">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[12px] font-semibold text-content-1">{col}</span>
+                            {isPk && (
+                              <span className="text-[9px] font-bold px-1 py-0.5 rounded"
+                                style={{ background: "var(--ds-warning-muted)", color: "var(--ds-warning)", border: "1px solid var(--ds-warning-border)" }}>
+                                PK
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center font-mono text-[11px] font-medium px-2 py-0.5 rounded-md" style={typeStyle}>
+                            {typeStr || "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {fkTarget ? (
+                            <span className="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded-md"
+                              style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.18)" }}>
+                              → {fkTarget}
+                            </span>
+                          ) : (
+                            <span className="text-content-3 text-[12px]">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {isNotNull ? (
+                            <span className="text-[11px] font-mono font-medium text-content-3">NOT NULL</span>
+                          ) : (
+                            <span className="text-[11px] italic text-content-3">nullable</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState
+              icon={FileSearch}
+              title={loading ? "Loading schema…" : "Select a table"}
+              description={loading ? "" : "Choose a table from the sidebar to view its columns and types."}
+            />
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -224,49 +311,82 @@ function SavedQueriesView() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex-shrink-0 border-b border-border px-6 py-4" style={{ background: "var(--ds-base-1)" }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Bookmark className="h-5 w-5 text-content-3" />
-            <div>
-              <h2 className="text-[14px] font-semibold text-content-1">Saved Queries</h2>
-              <p className="text-[12px] text-content-3 mt-0.5">Reusable SQL snippets saved from the chat.</p>
-            </div>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-content-3 pointer-events-none" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search snippets…"
-              className="h-8 pl-8 pr-3 rounded-lg text-[12px] w-48 text-content-1 placeholder:text-content-3 outline-none"
-              style={{ background: "var(--ds-base-0)", border: "1px solid var(--ds-border-subtle)", boxShadow: "var(--ds-shadow-inset)" }} />
-          </div>
+      {/* Header */}
+      <div
+        className="flex-shrink-0 flex items-center gap-4 px-6 py-3.5 border-b border-border"
+        style={{ background: "var(--ds-base-1)" }}
+      >
+        <div className="flex items-center gap-2.5">
+          <Bookmark className="h-4 w-4 text-content-3" />
+          <h2 className="text-[14px] font-semibold text-content-1">Saved Queries</h2>
+          {snippets.length > 0 && (
+            <span className="text-[12px] text-content-3">{snippets.length} saved</span>
+          )}
+        </div>
+        <div className="ml-auto relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-content-3 pointer-events-none" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search queries…"
+            className="h-8 pl-8 pr-3 rounded-lg text-[12px] w-52 text-content-1 placeholder:text-content-3 outline-none"
+            style={{ background: "var(--ds-base-0)", border: "1px solid var(--ds-border-subtle)", boxShadow: "var(--ds-shadow-inset)" }}
+          />
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 py-5">
+
+      {/* Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 py-4">
         {!activeConnectionId ? (
           <EmptyState icon={Database} title="No database connected" description="Connect a database to view saved queries."
             action={<Link href="/connections/new"><Button size="sm">Add Database</Button></Link>} />
         ) : loading ? (
-          <div className="flex items-center justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-content-3" /></div>
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-5 w-5 animate-spin text-content-3" />
+          </div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon={Bookmark} title={search ? "No matching snippets" : "No saved queries yet"}
-            description={search ? "Try a different search term." : "Save SQL snippets from chat to build your library."} />
+          <EmptyState
+            icon={Bookmark}
+            title={search ? "No matching queries" : "No saved queries yet"}
+            description={search ? "Try a different search term." : "Save SQL snippets from the chat to build your library."}
+          />
         ) : (
-          <div className="grid grid-cols-1 gap-3 max-w-3xl">
+          <div className="space-y-2.5">
             {filtered.map((snippet: any) => (
-              <div key={snippet.id}
-                className="rounded-xl border border-border bg-base-0 p-4 hover:border-[var(--ds-border-moderate)] transition-[border-color]"
-                style={{ boxShadow: "var(--ds-shadow-sm)" }}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 space-y-2 flex-1">
-                    <h3 className="text-[13px] font-semibold text-content-1">{snippet.title}</h3>
-                    <pre className="font-mono text-[11px] text-content-3 bg-base-2 px-3 py-2 rounded-lg border border-border overflow-x-auto">
-                      {snippet.sql_text}
-                    </pre>
+              <div
+                key={snippet.id}
+                className="rounded-xl border border-border overflow-hidden bg-base-0 transition-[border-color] hover:border-[var(--ds-border-moderate)]"
+                style={{ boxShadow: "var(--ds-shadow-sm)" }}
+              >
+                {/* Card header */}
+                <div
+                  className="flex items-center justify-between px-4 py-3 border-b border-border"
+                  style={{ background: "var(--ds-base-1)" }}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Bookmark className="h-3.5 w-3.5 text-brand flex-shrink-0" />
+                    <h3 className="text-[13px] font-semibold text-content-1 truncate">{snippet.title}</h3>
                   </div>
-                  <Button size="sm" variant="outline" className="flex-shrink-0 h-8 gap-1.5 text-[12px]">
-                    <Play className="h-3 w-3" />
-                    Run
-                  </Button>
+                  <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+                    <Button
+                      variant="outline" size="sm"
+                      onClick={() => { navigator.clipboard.writeText(snippet.sql_text); toast("Copied SQL", "success"); }}
+                      className="h-7 gap-1.5 px-2.5 text-[11px]"
+                    >
+                      <Copy className="h-3 w-3" />
+                      Copy SQL
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-[11px]">
+                      <Play className="h-3 w-3" />
+                      Run
+                    </Button>
+                  </div>
+                </div>
+                {/* SQL block — wrapper div owns the scroll so overflow-hidden on the card doesn't fight it */}
+                <div className="overflow-x-auto custom-scrollbar" style={{ background: "var(--ds-base-0)" }}>
+                  <pre className="px-4 py-3 font-mono text-[11px] text-content-2 leading-relaxed whitespace-pre min-w-max">
+                    {snippet.sql_text}
+                  </pre>
                 </div>
               </div>
             ))}
@@ -279,13 +399,26 @@ function SavedQueriesView() {
 
 /* ── History ──────────────────────────────────────────────── */
 
+function relativeTime(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
 function HistoryView() {
   const { activeConnectionId } = useStore();
   const { toast } = useToast();
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const fetchHistory = useCallback(async () => {
     if (!activeConnectionId) return;
@@ -306,7 +439,7 @@ function HistoryView() {
     try {
       await deleteHistory(id);
       setEntries((prev) => prev.filter((e) => e.id !== id));
-      setOpenMenuId(null);
+      if (expandedId === id) setExpandedId(null);
     } catch {
       toast("Failed to delete entry.", "error");
     }
@@ -320,69 +453,141 @@ function HistoryView() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex-shrink-0 border-b border-border px-6 py-4" style={{ background: "var(--ds-base-1)" }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Clock className="h-5 w-5 text-content-3" />
-            <div>
-              <h2 className="text-[14px] font-semibold text-content-1">History</h2>
-              <p className="text-[12px] text-content-3 mt-0.5">Your recent queries and their results.</p>
-            </div>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-content-3 pointer-events-none" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search history…"
-              className="h-8 pl-8 pr-3 rounded-lg text-[12px] w-48 text-content-1 placeholder:text-content-3 outline-none"
-              style={{ background: "var(--ds-base-0)", border: "1px solid var(--ds-border-subtle)", boxShadow: "var(--ds-shadow-inset)" }} />
-          </div>
+      {/* Header */}
+      <div
+        className="flex-shrink-0 flex items-center gap-4 px-6 py-3.5 border-b border-border"
+        style={{ background: "var(--ds-base-1)" }}
+      >
+        <div className="flex items-center gap-2.5">
+          <Clock className="h-4 w-4 text-content-3" />
+          <h2 className="text-[14px] font-semibold text-content-1">History</h2>
+          {entries.length > 0 && (
+            <span className="text-[12px] text-content-3">{entries.length} queries</span>
+          )}
+        </div>
+        <div className="ml-auto relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-content-3 pointer-events-none" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search history…"
+            className="h-8 pl-8 pr-3 rounded-lg text-[12px] w-52 text-content-1 placeholder:text-content-3 outline-none"
+            style={{ background: "var(--ds-base-0)", border: "1px solid var(--ds-border-subtle)", boxShadow: "var(--ds-shadow-inset)" }}
+          />
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 py-5">
+
+      {/* Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 py-4">
         {!activeConnectionId ? (
           <EmptyState icon={Database} title="No database connected" description="Connect a database to view query history."
             action={<Link href="/connections/new"><Button size="sm">Add Database</Button></Link>} />
         ) : loading ? (
-          <div className="flex items-center justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-content-3" /></div>
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-5 w-5 animate-spin text-content-3" />
+          </div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon={Clock} title={search ? "No matching results" : "No history yet"}
-            description={search ? "Try a different search term." : "Your query history will appear here after your first query."} />
+          <EmptyState
+            icon={Clock}
+            title={search ? "No matching results" : "No history yet"}
+            description={search ? "Try a different search term." : "Your query history will appear here after your first query."}
+          />
         ) : (
-          <div className="space-y-2 max-w-3xl">
-            {filtered.map((entry: any) => (
-              <div key={entry.id}
-                className="relative group rounded-xl border border-border bg-base-0 px-4 py-3 hover:border-[var(--ds-border-moderate)] transition-[border-color]"
-                style={{ boxShadow: "var(--ds-shadow-sm)" }}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-medium text-content-1 truncate">{entry.user_question}</p>
-                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-content-3 font-mono flex-wrap">
-                      <span className={entry.execution_status === "success" ? "text-success font-semibold" : "text-error font-semibold"}>
-                        {entry.execution_status}
-                      </span>
-                      {entry.row_count != null && <span>{entry.row_count} rows</span>}
-                      {entry.execution_time_ms != null && <span>{entry.execution_time_ms}ms</span>}
-                      <span>{new Date(entry.timestamp).toLocaleString()}</span>
-                    </div>
-                  </div>
+          <div className="space-y-2">
+            {filtered.map((entry: any) => {
+              const isSuccess = entry.execution_status === "success";
+              const isExpanded = expandedId === entry.id;
+              return (
+                <div
+                  key={entry.id}
+                  className="rounded-xl border border-border bg-base-0 overflow-hidden transition-[border-color] hover:border-[var(--ds-border-moderate)]"
+                  style={{ boxShadow: "var(--ds-shadow-sm)" }}
+                >
+                  {/* Clickable summary row */}
                   <button
-                    onClick={() => setOpenMenuId(openMenuId === entry.id ? null : entry.id)}
-                    className="opacity-0 group-hover:opacity-100 h-7 w-7 flex items-center justify-center rounded-lg text-content-3 hover:bg-base-2 hover:text-content-1 transition-all flex-shrink-0"
+                    onClick={() => setExpandedId(isExpanded ? null : entry.id)}
+                    className="w-full text-left px-4 py-3 flex items-start gap-3"
                   >
-                    <MoreHorizontal className="h-4 w-4" />
+                    {/* Status dot */}
+                    <div
+                      className="mt-[5px] h-2 w-2 rounded-full flex-shrink-0"
+                      style={{ background: isSuccess ? "var(--ds-success)" : "var(--ds-error)" }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-content-1 leading-snug line-clamp-2">
+                        {entry.user_question}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1.5 text-[11px] text-content-3 flex-wrap">
+                        <span
+                          className="font-semibold"
+                          style={{ color: isSuccess ? "var(--ds-success)" : "var(--ds-error)" }}
+                        >
+                          {isSuccess ? "success" : "error"}
+                        </span>
+                        {entry.row_count != null && (
+                          <span>{entry.row_count.toLocaleString()} rows</span>
+                        )}
+                        {entry.execution_time_ms != null && (
+                          <span>{entry.execution_time_ms}ms</span>
+                        )}
+                        <span>{relativeTime(entry.timestamp)}</span>
+                      </div>
+                    </div>
+                    <ChevronDown
+                      className={[
+                        "h-4 w-4 text-content-3 flex-shrink-0 mt-0.5 transition-transform duration-150",
+                        isExpanded ? "rotate-180" : "",
+                      ].join(" ")}
+                    />
                   </button>
+
+                  {/* Expanded: SQL + actions */}
+                  {isExpanded && (
+                    <div className="border-t border-border">
+                      {entry.generated_sql ? (
+                        <pre
+                          className="px-4 py-3 font-mono text-[11px] text-content-2 overflow-x-auto custom-scrollbar leading-relaxed"
+                          style={{ background: "var(--ds-base-2)" }}
+                        >
+                          {entry.generated_sql}
+                        </pre>
+                      ) : (
+                        <p className="px-4 py-3 text-[12px] text-content-3 italic" style={{ background: "var(--ds-base-2)" }}>
+                          No SQL generated.
+                        </p>
+                      )}
+                      <div
+                        className="flex items-center gap-2 px-4 py-2.5 border-t border-border"
+                        style={{ background: "var(--ds-base-1)" }}
+                      >
+                        {entry.generated_sql && (
+                          <Button
+                            variant="outline" size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(entry.generated_sql);
+                              toast("Copied SQL", "success");
+                            }}
+                            className="h-7 gap-1.5 px-2.5 text-[11px]"
+                          >
+                            <Copy className="h-3 w-3" />
+                            Copy SQL
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost" size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }}
+                          className="h-7 gap-1.5 px-2.5 text-[11px] ml-auto text-error hover:bg-[var(--ds-error-muted)] hover:text-error"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {openMenuId === entry.id && (
-                  <div className="absolute right-3 top-10 z-30 w-36 rounded-lg p-1 text-[13px]"
-                    style={{ background: "var(--ds-base-2)", border: "1px solid var(--ds-border-moderate)", boxShadow: "var(--ds-shadow-md)" }}>
-                    <button onClick={() => handleDelete(entry.id)}
-                      className="flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-error hover:bg-[var(--ds-error-muted)] transition-colors">
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

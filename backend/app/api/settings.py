@@ -153,10 +153,11 @@ def update_organization(
         raise HTTPException(status_code=404, detail="Organization not found.")
 
     org.name = data.name
+    org.slug = data.name.lower().replace(" ", "-")
     db.commit()
 
     logger.info(f"Organization renamed to '{data.name}' by {current_user.email}")
-    return {"status": "success", "name": org.name}
+    return {"status": "success", "name": org.name, "slug": org.slug}
 
 
 # ── Team ─────────────────────────────────────────────────────────────────────

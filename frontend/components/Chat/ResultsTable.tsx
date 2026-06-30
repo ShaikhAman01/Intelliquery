@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Maximize2,
   X,
@@ -10,7 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -96,6 +96,16 @@ function TableGrid({
 export function ResultsTable({ data, executionTime, className = '' }: ResultsTableProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const [page, setPage] = useState(0);
+  const [mainEl, setMainEl] = useState<Element | null>(null);
+
+  useEffect(() => { setMainEl(document.querySelector('main')); }, []);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [fullscreen]);
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
   const totalPages = Math.ceil(data.length / PAGE_SIZE);
@@ -210,62 +220,81 @@ export function ResultsTable({ data, executionTime, className = '' }: ResultsTab
   );
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.18, ease: [0, 0, 0.2, 1] }}
-        className={[
-          'rounded-xl border border-border overflow-hidden bg-base-0',
-          className,
-        ].join(' ')}
-        style={{ boxShadow: 'var(--ds-shadow-sm)', height: 320 }}
-      >
-        {TableContent}
-      </motion.div>
+    <>
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, ease: [0, 0, 0.2, 1] }}
+          className={[
+            'rounded-xl border border-border overflow-hidden bg-base-0',
+            className,
+          ].join(' ')}
+          style={{ boxShadow: 'var(--ds-shadow-sm)', height: 320 }}
+        >
+          {TableContent}
+        </motion.div>
+      </AnimatePresence>
 
-      {/* Fullscreen dialog */}
-      <Dialog open={fullscreen} onOpenChange={setFullscreen}>
-        <DialogContent
-          showCloseButton={false}
-          className="top-0 left-0 translate-x-0 translate-y-0 max-w-none w-screen h-screen rounded-none border-0 p-0 overflow-hidden"
+      {/* Fullscreen — portal into <main> so sidebar stays visible */}
+      {fullscreen && mainEl && createPortal(
+        <div
+          className="absolute inset-0 z-50 flex flex-col"
           style={{ background: 'var(--ds-base-0)' }}
         >
-          <DialogHeader className="sr-only">
-            <DialogTitle>Query Results</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col h-full">
-            {/* Fullscreen header */}
-            <div
-              className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-border"
-              style={{ background: 'var(--ds-base-1)' }}
-            >
-              <div className="flex items-center gap-3">
-                <p className="text-[14px] font-semibold text-content-1">Query Results</p>
-                <span className="text-[12px] text-content-3">
-                  {data.length.toLocaleString()} rows · {data[0] ? Object.keys(data[0]).length : 0} columns
-                  {executionTime != null && ` · ${executionTime}ms`}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={downloadCSV} className="h-8 gap-1.5 px-3 text-[12px]">
-                  <Download className="h-3.5 w-3.5" />
-                  Download CSV
-                </Button>
-                <button
-                  onClick={() => setFullscreen(false)}
-                  className="h-8 w-8 flex items-center justify-center rounded-lg text-content-3 hover:bg-base-3 hover:text-content-1 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+          {/* Header */}
+          <div
+            className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-border"
+            style={{ background: 'var(--ds-base-1)' }}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-[14px] font-semibold text-content-1">Query Results</span>
+              <span className="text-[12px] text-content-3">
+                <strong className="text-content-1 font-semibold">{data.length.toLocaleString()}</strong> rows ·{' '}
+                <strong className="text-content-1 font-semibold">{columns.length}</strong> columns
+                {executionTime != null && <> · <strong className="text-content-1 font-semibold">{executionTime}</strong>ms</>}
+              </span>
             </div>
-            <div className="flex-1 min-h-0">
-              {TableContent}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={downloadCSV} className="h-8 gap-1.5 px-3 text-[12px]">
+                <Download className="h-3.5 w-3.5" />
+                Download CSV
+              </Button>
+              <button
+                onClick={() => setFullscreen(false)}
+                className="h-8 w-8 flex items-center justify-center rounded-lg text-content-3 hover:bg-base-3 hover:text-content-1 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-    </AnimatePresence>
+          {/* Table — fills remaining height, scrolls both axes */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <TableGrid data={data} columns={columns} page={page} />
+          </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div
+              className="flex-shrink-0 flex items-center justify-between px-6 py-2.5 border-t border-border text-[12px] text-content-3"
+              style={{ background: 'var(--ds-base-1)' }}
+            >
+              <span>
+                Rows {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, data.length)} of {data.length.toLocaleString()}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)} className="h-7 w-7 p-0">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-2 font-medium text-content-1">{page + 1} / {totalPages}</span>
+                <Button variant="ghost" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} className="h-7 w-7 p-0">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>,
+        mainEl
+      )}
+    </>
   );
 }
