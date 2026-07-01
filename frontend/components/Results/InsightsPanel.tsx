@@ -50,7 +50,8 @@ export const InsightsPanel = ({ data, explanation, insights }: InsightsPanelProp
 
     const quality = totalCells > 0 ? Math.round(((totalCells - nullCount) / totalCells) * 100) : 100;
     const numericKeys = Object.keys(numericMetrics);
-    const focusKey = numericKeys[numericKeys.length - 1] || null;
+    const metricKeys = numericKeys.filter(k => !/(phone|mobile|tel|zip|postal|pin|ssn|fax|^id$|_id$)/i.test(k));
+    const focusKey = (metricKeys.length > 0 ? metricKeys : numericKeys).slice(-1)[0] || null;
 
     let computedAverage = 0;
     let computedPeak = 0;

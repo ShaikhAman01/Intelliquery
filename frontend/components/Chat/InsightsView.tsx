@@ -107,7 +107,7 @@ function deriveKPIs(data: Record<string, unknown>[], stats: ColStats[]): KPI[] {
 
   kpis.push({ label: 'Total Rows', value: data.length.toLocaleString(), sub: `${stats.length} column${stats.length !== 1 ? 's' : ''}`, color: COLORS[0] });
 
-  const nonIdNums = stats.filter(s => s.type === 'number' && !/(^id$|_id$|^pk$|^key$)/i.test(s.name));
+  const nonIdNums = stats.filter(s => s.type === 'number' && !/(^id$|_id$|^pk$|^key$|phone|mobile|tel|zip|postal|pin|ssn|fax)/i.test(s.name));
   nonIdNums.slice(0, 2).forEach((s, i) => {
     if (s.sum !== undefined && s.mean !== undefined) {
       kpis.push({ label: s.name.replace(/_/g, ' '), value: fmt(s.sum), sub: `avg ${fmt(s.mean)}`, color: COLORS[i + 1] });

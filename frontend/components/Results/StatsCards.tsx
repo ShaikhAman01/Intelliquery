@@ -39,7 +39,8 @@ export const StatsCards = ({ data, executionTime }: StatsCardsProps) => {
     let peakSub   = 'Upper bound';
 
     if (numericCols.length > 0) {
-      const col  = numericCols[numericCols.length - 1];
+      const metricCols = numericCols.filter(k => !/(phone|mobile|tel|zip|postal|pin|ssn|fax|^id$|_id$)/i.test(k));
+      const col  = (metricCols.length > 0 ? metricCols : numericCols).slice(-1)[0];
       meanLabel  = col.replace(/_/g, ' ');
       const nums = data.map((r) => Number(r[col]) || 0);
       const avg  = nums.reduce((a, b) => a + b, 0) / nums.length;

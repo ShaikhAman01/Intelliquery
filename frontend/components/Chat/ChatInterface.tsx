@@ -21,6 +21,7 @@ import {
   Check,
   Bookmark,
   ChevronDown,
+  ChevronUp,
   Loader2,
   ArrowUp,
   Database,
@@ -62,6 +63,7 @@ interface ChatMessage {
   sqlEditing: boolean;
   editedSql: string;
   isRunningEdit: boolean;
+  isConversational?: boolean;
 }
 
 /* ── AI workflow stages ─────────────────────────────────────── */
@@ -289,9 +291,10 @@ interface MessageProps {
   onSaveSnippet: (id: string) => void;
   connectionId: number | null;
   onSelect?: (text: string) => void;
+  onRetry?: (query: string) => void;
 }
 
-function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect }: MessageProps) {
+function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect, onRetry }: MessageProps) {
   const { toast } = useToast();
 
   const displaySql = msg.editedSql || msg.sql || '';
@@ -359,16 +362,41 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect }: Messa
           {/* Error state */}
           {msg.status === 'error' && (
             <div
-              className="rounded-2xl rounded-tl-sm px-4 py-3 text-[13px] text-error flex items-start gap-2"
+              className="rounded-2xl rounded-tl-sm px-4 py-4 text-[13px] space-y-3"
               style={{ background: 'var(--ds-error-muted)', border: '1px solid var(--ds-error-border)' }}
             >
-              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-              {msg.errorMessage || 'Something went wrong. Please try again.'}
+              <div className="flex items-start gap-2.5 text-error">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span className="leading-relaxed">
+                  {msg.errorMessage || "Couldn't generate a valid query for that question."}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 pl-6">
+                <button
+                  onClick={() => onRetry?.(msg.userQuery)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors"
+                  style={{ background: 'var(--ds-error-border)', color: 'var(--ds-error)' }}
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Try rephrasing
+                </button>
+                <span className="text-[12px] text-error/60">or add more context to your question</span>
+              </div>
+            </div>
+          )}
+
+          {/* Conversational response */}
+          {msg.status === 'ready' && msg.isConversational && msg.explanation && (
+            <div
+              className="rounded-2xl rounded-tl-sm px-5 py-4 text-[14px] leading-relaxed text-content-2 whitespace-pre-line"
+              style={{ background: 'var(--ds-base-1)', border: '1px solid var(--ds-border-subtle)' }}
+            >
+              {msg.explanation}
             </div>
           )}
 
           {/* Ready state */}
-          {msg.status === 'ready' && msg.sql && (
+          {msg.status === 'ready' && !msg.isConversational && msg.sql && (
             <>
               {/* AI response card */}
               {(msg.explanation || (msg.data && msg.data.length > 0)) && (
@@ -482,8 +510,8 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect }: Messa
                   onClick={() => onUpdate(msg.id, { runExpanded: !msg.runExpanded, insightsExpanded: false })}
                   className="h-9 gap-1.5 text-[13px] font-medium px-4"
                 >
-                  <Play className="h-4 w-4" />
-                  {msg.runExpanded ? 'Hide Results' : 'Run'}
+                  {msg.runExpanded ? <ChevronUp className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {msg.runExpanded ? 'Hide Results' : 'Show Results'}
                 </Button>
 
                 <Button
@@ -565,7 +593,7 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect }: Messa
 
               {/* Run results */}
               <AnimatePresence>
-                {msg.runExpanded && msg.data && (
+                {msg.runExpanded && msg.data && msg.data.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -580,9 +608,10 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect }: Messa
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="rounded-xl border border-border bg-base-1 px-5 py-6 text-center text-[13px] text-content-3"
+                    className="rounded-xl border border-border bg-base-1 px-5 py-6 text-center space-y-1"
                   >
-                    Query returned 0 rows.
+                    <p className="text-[14px] font-medium text-content-2">No results found</p>
+                    <p className="text-[13px] text-content-3">The query ran successfully but returned 0 rows. Try broadening your filters or adjusting the date range.</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -667,6 +696,26 @@ function getSuggestionsFromTables(tableNames: string[]) {
 
   return result.length > 0 ? result : FALLBACK_SUGGESTIONS;
 }
+
+const META_PATTERNS = [
+  /\bwho are you\b/i,
+  /\bwhat (is|are) (you|intelliquery)\b/i,
+  /\bwhat can (you|intelliquery) do\b/i,
+  /\bhow (do you|does intelliquery) work\b/i,
+  /\btell me about (yourself|intelliquery)\b/i,
+  /^(hi|hello|hey)[^a-z]*$/i,
+];
+
+const INTELLIQUERY_RESPONSE = `I'm IntelliQuery — your AI-powered SQL assistant. I translate plain English questions into SQL queries and analyze your database results.
+
+Here's what I can help with:
+• Ask questions about your data in plain English
+• Generate and run optimized SQL queries automatically
+• Visualize results as charts, tables, and KPI cards
+• Surface AI insights and observations from your data
+• Save useful queries as snippets for later
+
+Try asking something like "Show me the top 10 customers by revenue" or "Which products had the most sales last month?"`;
 
 const ONBOARDING_EXAMPLES = [
   'Show me the top 10 customers by revenue',
@@ -866,6 +915,21 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
       return;
     }
 
+    /* Answer meta/conversational questions locally without hitting the backend */
+    if (META_PATTERNS.some(p => p.test(query))) {
+      const id = `msg-${Date.now()}`;
+      setMessages(prev => [
+        ...prev,
+        { id, userQuery: query, status: 'thinking', runExpanded: false, insightsExpanded: false, saveOpen: false, snippetTitle: '', copied: false, sqlEditing: false, editedSql: '', isRunningEdit: false },
+      ]);
+      if (typeof overrideQuery !== 'string') {
+        setInput('');
+        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      }
+      setTimeout(() => updateMessage(id, { status: 'ready', isConversational: true, explanation: INTELLIQUERY_RESPONSE }), 500);
+      return;
+    }
+
     const id = `msg-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
@@ -900,6 +964,7 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
         chartRec: result.chart_recommendation,
         executionTime: result.execution_time_ms,
         status: 'ready',
+        runExpanded: true,
       });
     } catch (err: unknown) {
       let detail = 'Something went wrong. Please try again.';
@@ -907,8 +972,14 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
         const e = err as Record<string, unknown>;
         const res = e.response as Record<string, unknown> | undefined;
         const resData = res?.data as Record<string, unknown> | undefined;
-        if (typeof resData?.detail === 'string') detail = resData.detail;
-        else if (e instanceof Error) detail = (e as Error).message;
+        const httpStatus = res?.status as number | undefined;
+        if (httpStatus === 500) {
+          detail = "Couldn't process that question. Try rephrasing with clearer terms, or check for typos.";
+        } else if (typeof resData?.detail === 'string') {
+          detail = resData.detail;
+        } else if (e instanceof Error) {
+          detail = (e as Error).message;
+        }
       }
       updateMessage(id, { status: 'error', errorMessage: detail });
     } finally {
@@ -1051,6 +1122,10 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
                   onSaveSnippet={handleSaveSnippet}
                   connectionId={activeConnectionId}
                   onSelect={handleSuggestion}
+                  onRetry={(query) => {
+                    setInput(query);
+                    setTimeout(() => textareaRef.current?.focus(), 0);
+                  }}
                 />
               ))}
               <div ref={bottomRef} />
