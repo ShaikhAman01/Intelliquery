@@ -231,7 +231,7 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: ()
 
 export default function NewConnectionPage() {
   const router = useRouter();
-  const { addConnection } = useStore();
+  const { addConnection, setActiveConnection } = useStore();
 
   const [step, setStep]       = useState(0);
   const [loading, setLoading] = useState(false);
@@ -362,6 +362,7 @@ export default function NewConnectionPage() {
           excluded_columns: excludedColumns,
         });
         addConnection(conn);
+        if (conn.id || conn.connection_id) setActiveConnection(conn.id ?? conn.connection_id);
         setDone(true);
       } catch (err: any) {
         setError(extractErrorMessage(err, "Failed to save connection."));

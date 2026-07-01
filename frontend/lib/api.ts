@@ -8,6 +8,19 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+if (typeof window !== 'undefined') {
+  api.interceptors.response.use(
+    res => res,
+    err => {
+      if (err?.response?.status === 401) {
+        const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/sign-in?redirect=${redirect}`;
+      }
+      return Promise.reject(err);
+    }
+  );
+}
+
 // ── Connections ──────────────────────────────────────────────────────────────
 
 export const getConnections = async () => {

@@ -6,13 +6,14 @@ import { authClient } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SignIn() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/';
+  const resetSuccess = searchParams.get('reset') === 'success';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,6 +45,20 @@ export default function SignIn() {
         <p className="text-[14px] text-content-3">Sign in to your Intelliquery account</p>
       </div>
 
+      {resetSuccess && (
+        <div
+          className="flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-[13px]"
+          style={{
+            background: 'var(--ds-success-muted)',
+            border: '1px solid var(--ds-success-border)',
+            color: 'var(--ds-success)',
+          }}
+        >
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>Password reset successfully. Sign in with your new password.</span>
+        </div>
+      )}
+
       <form onSubmit={handleSignIn} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email" className="text-[13px] font-medium text-content-2">Email</Label>
@@ -59,7 +74,12 @@ export default function SignIn() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-[13px] font-medium text-content-2">Password</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password" className="text-[13px] font-medium text-content-2">Password</Label>
+            <Link href="/forgot-password" className="text-[13px] text-content-3 hover:text-content-1 transition-colors">
+              Forgot password?
+            </Link>
+          </div>
           <div className="relative">
             <Input
               id="password"

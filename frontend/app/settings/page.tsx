@@ -14,9 +14,9 @@ import {
 } from '@/components/ui/select';
 import {
   User, Building2, Users, Shield, Mail, Copy, Check,
-  Loader2, AlertCircle, ArrowLeft, Pencil, LogOut,
+  Loader2, AlertCircle, ArrowLeft, Pencil, LogOut, Eye, EyeOff,
 } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
 import {
@@ -168,6 +168,115 @@ function Section({ title, description, children }: { title: string; description?
       </div>
       <div className="p-7">{children}</div>
     </div>
+  );
+}
+
+/* ── Change password section ─────────────────────────────── */
+
+function ChangePasswordSection() {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNext, setShowNext] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const passwordsMatch = next === confirm;
+  const isStrong = next.length >= 8;
+  const canSubmit = !!current && isStrong && passwordsMatch && !!confirm;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setMsg(null);
+    startTransition(async () => {
+      const { error } = await (authClient as any).changePassword({
+        currentPassword: current,
+        newPassword: next,
+        revokeOtherSessions: true,
+      });
+      if (error) {
+        setMsg({ text: error.message || 'Failed to change password.', type: 'error' });
+      } else {
+        setMsg({ text: 'Password changed. Other sessions have been signed out.', type: 'success' });
+        setCurrent(''); setNext(''); setConfirm('');
+      }
+    });
+  };
+
+  return (
+    <Section title="Password" description="Change the password used to sign in">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="current-pw" className="text-[13px] font-medium text-content-2">Current password</Label>
+          <div className="relative">
+            <Input
+              id="current-pw"
+              type={showCurrent ? 'text' : 'password'}
+              value={current}
+              onChange={e => setCurrent(e.target.value)}
+              placeholder="••••••••"
+              className="h-10 pr-10"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowCurrent(!showCurrent)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-content-3 hover:text-content-1 transition-colors"
+            >
+              {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="new-pw" className="text-[13px] font-medium text-content-2">New password</Label>
+          <div className="relative">
+            <Input
+              id="new-pw"
+              type={showNext ? 'text' : 'password'}
+              value={next}
+              onChange={e => setNext(e.target.value)}
+              placeholder="At least 8 characters"
+              className="h-10 pr-10"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowNext(!showNext)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-content-3 hover:text-content-1 transition-colors"
+            >
+              {showNext ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirm-pw" className="text-[13px] font-medium text-content-2">Confirm new password</Label>
+          <Input
+            id="confirm-pw"
+            type="password"
+            value={confirm}
+            onChange={e => setConfirm(e.target.value)}
+            placeholder="Same password again"
+            className="h-10"
+            required
+            style={confirm && !passwordsMatch ? { borderColor: 'var(--ds-error)' } : {}}
+          />
+          {confirm && !passwordsMatch && (
+            <p className="text-[12px] text-error">Passwords don't match.</p>
+          )}
+        </div>
+
+        {msg && <StatusMessage message={msg.text} type={msg.type} />}
+
+        <Button type="submit" disabled={!canSubmit || isPending} className="gap-2">
+          {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          Update password
+        </Button>
+      </form>
+    </Section>
   );
 }
 
@@ -323,6 +432,8 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
           ))}
         </div>
       </Section>
+
+      <ChangePasswordSection />
 
       {/* Sign out */}
       <Section title="Session" description="Manage your active session">

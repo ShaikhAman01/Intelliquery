@@ -50,7 +50,7 @@ function getUrlPlaceholder(dbType: string): string {
 }
 
 export function AddConnectionDialog({ trigger }: Props = {}) {
-  const { addConnection } = useStore();
+  const { addConnection, setActiveConnection } = useStore();
   const formRef = useRef<HTMLFormElement>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -116,7 +116,7 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
     try {
       const res = await createConnection(formData);
       if (res.status === "success") {
-        addConnection({
+        const newConn = {
           id: res.connection_id,
           name: formData.name,
           db_type: formData.db_type,
@@ -125,7 +125,9 @@ export function AddConnectionDialog({ trigger }: Props = {}) {
           username: formData.username || "",
           db_name: formData.db_name || "",
           use_ssl: formData.use_ssl || false,
-        });
+        };
+        addConnection(newConn);
+        setActiveConnection(newConn.id);
         setOpen(false);
       }
     } catch (err: unknown) {

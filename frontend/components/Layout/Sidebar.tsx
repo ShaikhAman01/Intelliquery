@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useStore } from '@/lib/store';
+import { useStore, type Connection } from '@/lib/store';
 import { getConnections, deleteConnection, toggleConnectionStatus, testConnectionById } from '@/lib/api';
 import { type Session } from '@/lib/sessions';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -105,7 +105,17 @@ export const Sidebar = ({
   }, []);
 
   useEffect(() => {
-    getConnections().then((data) => setConnections(data)).catch(() => {});
+    getConnections().then((data) => {
+      setConnections(data);
+      const { activeConnectionId: stored, setActiveConnection } = useStore.getState();
+      const firstActive = data.find((c: Connection) => c.is_active !== false);
+      if (stored) {
+        const stillValid = data.find((c: Connection) => c.id === stored && c.is_active !== false);
+        if (!stillValid) setActiveConnection(firstActive?.id ?? null);
+      } else if (firstActive) {
+        setActiveConnection(firstActive.id);
+      }
+    }).catch(() => {});
   }, [setConnections]);
 
   const handleToggleDisable = useCallback(async (id: number, currentlyActive: boolean) => {
