@@ -405,6 +405,7 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
                   onClick={async () => {
                     closeAll();
                     await authClient.signOut();
+                    localStorage.removeItem('iq-connection');
                     window.location.href = '/sign-in';
                   }}
                   className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] text-error hover:bg-[var(--ds-error-muted)] transition-colors"

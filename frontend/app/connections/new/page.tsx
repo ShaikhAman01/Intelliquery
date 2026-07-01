@@ -391,7 +391,10 @@ export default function NewConnectionPage() {
           </div>
           <h1 className="text-[24px] font-bold text-content-1">Connected!</h1>
           <p className="mt-2 text-[14px] text-content-3">Your database is ready. Start exploring with natural language queries.</p>
-          <Button className="mt-8 w-full gap-2" onClick={() => router.push("/")}>
+          <Button className="mt-8 w-full gap-2" onClick={() => {
+            sessionStorage.setItem('iq_new_connection', '1');
+            router.push('/');
+          }}>
             <Sparkles className="h-4 w-4" />Start Querying
           </Button>
         </motion.div>

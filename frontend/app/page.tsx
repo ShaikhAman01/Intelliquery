@@ -46,20 +46,21 @@ export default function Dashboard() {
   }
 
   if (!session) return <LandingPage />;
-  return <AppShell />;
+  return <AppShell userId={(session as any).user?.id ?? ''} />;
 }
 
 /* ── App Shell ────────────────────────────────────────────── */
 
 type View = "chat" | "schema" | "snippets" | "history";
 
-function AppShell() {
+function AppShell({ userId }: { userId: string }) {
   const [activeView, setActiveView] = useState<View>("chat");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pendingReplay, setPendingReplay] = useState<string | null>(null);
   const [pendingReplayCached, setPendingReplayCached] = useState<{ question: string; sql: string } | null>(null);
   const [chatKey, setChatKey] = useState(0);
   const [recentsKey, setRecentsKey] = useState(0);
+  const { toast } = useToast();
 
   /* ── Session management ──────────────────────────────────── */
   const [currentSessionId, setCurrentSessionId] = useState('');
@@ -68,23 +69,27 @@ function AppShell() {
 
   useEffect(() => {
     setCurrentSessionId(createSessionId());
-    setSessions(getSessions());
-  }, []);
+    setSessions(getSessions(userId));
+    if (sessionStorage.getItem('iq_new_connection')) {
+      sessionStorage.removeItem('iq_new_connection');
+      toast('Database connected — ask your first question below!', 'success');
+    }
+  }, [toast, userId]);
 
-  const refreshSessions = useCallback(() => setSessions(getSessions()), []);
+  const refreshSessions = useCallback(() => setSessions(getSessions(userId)), [userId]);
 
   const handleQueryComplete = useCallback((question: string, sql: string, connectionId: number) => {
     if (!currentSessionId) return;
-    const existing = getSession(currentSessionId);
+    const existing = getSession(userId, currentSessionId);
     const updated: Session = existing
       ? { ...existing, queries: [...existing.queries, { question, sql, timestamp: Date.now() }], updatedAt: Date.now() }
       : { id: currentSessionId, title: question, connectionId, queries: [{ question, sql, timestamp: Date.now() }], updatedAt: Date.now() };
-    upsertSession(updated);
+    upsertSession(userId, updated);
     refreshSessions();
-  }, [currentSessionId, refreshSessions]);
+  }, [userId, currentSessionId, refreshSessions]);
 
   const handleRestoreSession = useCallback((sessionId: string) => {
-    const session = getSession(sessionId);
+    const session = getSession(userId, sessionId);
     if (!session) return;
     setCurrentSessionId(session.id);
     setPendingRestore(session);

@@ -29,7 +29,7 @@ export default function SignUp() {
       if (error) {
         setError(error.message || 'Something went wrong. Please try again.');
       } else {
-        router.push(redirectTo);
+        router.push(redirectTo === '/' ? '/connections/new' : redirectTo);
       }
     });
   };

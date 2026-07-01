@@ -448,6 +448,7 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
             style={{ color: 'var(--ds-error)', borderColor: 'var(--ds-error-border)' }}
             onClick={async () => {
               await authClient.signOut();
+              localStorage.removeItem('iq-connection');
               window.location.href = '/sign-in';
             }}
           >

@@ -34,6 +34,7 @@ import {
   BarChart3,
   CheckCircle2,
   ArrowRight,
+  MessageSquare,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
@@ -667,13 +668,21 @@ function getSuggestionsFromTables(tableNames: string[]) {
   return result.length > 0 ? result : FALLBACK_SUGGESTIONS;
 }
 
+const ONBOARDING_EXAMPLES = [
+  'Show me the top 10 customers by revenue',
+  'Which products had the most returns last month?',
+  'Compare signups this week vs last week',
+];
+
 function WelcomeScreen({
   onSelect,
   hasConnection,
+  hasAnyConnection,
   suggestions,
 }: {
   onSelect: (text: string) => void;
   hasConnection: boolean;
+  hasAnyConnection: boolean;
   suggestions: Suggestion[];
 }) {
   return (
@@ -686,31 +695,55 @@ function WelcomeScreen({
           <Sparkles className="h-10 w-10 text-white" />
         </div>
         <h1 className="text-[32px] font-bold text-content-1 tracking-tight">
-          What would you like to explore?
+          {!hasAnyConnection ? 'Get started' : 'What would you like to explore?'}
         </h1>
         <p className="mt-3 text-[16px] text-content-3 max-w-md mx-auto leading-relaxed">
-          Ask a question in plain English and Intelliquery will generate the SQL and analyze your data.
+          {!hasAnyConnection
+            ? 'Connect a database and ask questions in plain English — Intelliquery handles the SQL.'
+            : 'Ask a question in plain English and Intelliquery will generate the SQL and analyze your data.'
+          }
         </p>
       </div>
 
-      {!hasConnection ? (
+      {!hasAnyConnection ? (
+        /* ── First-time user: no connections at all ── */
+        <div className="flex flex-col items-center gap-5 w-full max-w-sm">
+          <div className="flex flex-col gap-2 w-full">
+            {ONBOARDING_EXAMPLES.map((ex) => (
+              <div
+                key={ex}
+                className="flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-left select-none"
+                style={{ background: 'var(--ds-base-1)', opacity: 0.45 }}
+              >
+                <MessageSquare className="h-4 w-4 text-brand flex-shrink-0" />
+                <span className="text-[14px] text-content-2">{ex}</span>
+              </div>
+            ))}
+          </div>
+          <Link href="/connections/new" className="w-full">
+            <Button className="w-full gap-2 h-11 text-[15px] font-semibold">
+              <PlusCircle className="h-4 w-4" />
+              Connect your first database
+            </Button>
+          </Link>
+          <p className="text-[12px] text-content-3">
+            Supports PostgreSQL, MySQL, SQLite, SQL Server, MariaDB and more
+          </p>
+        </div>
+      ) : !hasConnection ? (
+        /* ── Has connections but none active ── */
         <div
           className="flex flex-col items-center gap-4 rounded-2xl border border-border px-10 py-8"
           style={{ background: 'var(--ds-base-1)', boxShadow: 'var(--ds-shadow-sm)' }}
         >
           <Database className="h-10 w-10 text-content-3" />
           <div>
-            <p className="font-semibold text-content-1 text-[16px]">No database connected</p>
-            <p className="mt-1 text-[14px] text-content-3">Connect a database to start querying</p>
+            <p className="font-semibold text-content-1 text-[16px]">No database selected</p>
+            <p className="mt-1 text-[14px] text-content-3">Pick a database from the sidebar to start querying</p>
           </div>
-          <Link href="/connections/new">
-            <Button size="sm" className="gap-2">
-              <PlusCircle className="h-3.5 w-3.5" />
-              Add Database
-            </Button>
-          </Link>
         </div>
       ) : (
+        /* ── Active connection: show schema-based suggestions ── */
         <div className="flex flex-col gap-3 w-full max-w-xl">
           {suggestions.map(({ label, icon: Icon }) => (
             <button
@@ -995,6 +1028,7 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
   };
 
   const hasConnection = !!activeConnectionId && activeConnection?.is_active !== false;
+  const hasAnyConnection = connections.length > 0;
 
   return (
     <div className="flex flex-col h-full bg-base-0">
@@ -1005,7 +1039,7 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
 
           {messages.length === 0 ? (
             <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 280px)' }}>
-              <WelcomeScreen onSelect={handleSuggestion} hasConnection={hasConnection} suggestions={suggestions} />
+              <WelcomeScreen onSelect={handleSuggestion} hasConnection={hasConnection} hasAnyConnection={hasAnyConnection} suggestions={suggestions} />
             </div>
           ) : (
             <div className="space-y-8">
