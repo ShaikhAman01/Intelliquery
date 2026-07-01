@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/Layout/Sidebar";
 import { ChatInterface } from "@/components/Chat/ChatInterface";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { getSchema, getHistory, getSnippets, deleteHistory } from "@/lib/api";
+import { getSchema, getHistory, getSnippets, deleteHistory, refreshSchema } from "@/lib/api";
 import { type Session, getSessions, getSession, upsertSession, createSessionId } from "@/lib/sessions";
 import { useToast } from "@/components/ui/toaster";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -119,6 +119,11 @@ function AppShell({ userId }: { userId: string }) {
     setRecentsKey((k) => k + 1);
   };
 
+  const handleQueryTable = useCallback((tableName: string) => {
+    setPendingReplay(`Show me the top 20 records from "${tableName}"`);
+    setActiveView("chat");
+  }, []);
+
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-base-0">
       <Sidebar
@@ -146,7 +151,7 @@ function AppShell({ userId }: { userId: string }) {
               onQueryComplete={handleQueryComplete}
             />
           )}
-          {activeView === "schema"   && <SchemaView />}
+          {activeView === "schema"   && <SchemaView onQueryTable={handleQueryTable} />}
           {activeView === "snippets" && <SavedQueriesView onReplay={handleReplay} />}
           {activeView === "history"  && <HistoryView onReplay={handleReplay} />}
         </main>
@@ -170,29 +175,72 @@ function schemaTypeStyle(type: string) {
   return { background: "var(--ds-base-3)", color: "var(--ds-text-3)", border: "1px solid var(--ds-border-subtle)" };
 }
 
-function SchemaView() {
+function SchemaView({ onQueryTable }: { onQueryTable?: (tableName: string) => void }) {
   const { activeConnectionId } = useStore();
   const { toast } = useToast();
   const [tables, setTables] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [tableSearch, setTableSearch] = useState("");
+  const [colSearch, setColSearch] = useState("");
 
-  useEffect(() => {
+  const loadSchema = useCallback(() => {
     if (!activeConnectionId) return;
     setLoading(true);
     setSelected(null);
+    setColSearch("");
     getSchema(activeConnectionId)
       .then((res) => setTables(res.tables || res))
       .catch(() => toast("Failed to load schema.", "error"))
       .finally(() => setLoading(false));
   }, [activeConnectionId, toast]);
 
+  useEffect(() => { loadSchema(); }, [loadSchema]);
+
+  const handleRefresh = async () => {
+    if (!activeConnectionId || refreshing) return;
+    setRefreshing(true);
+    try {
+      await refreshSchema(activeConnectionId);
+      await loadSchema();
+      toast("Schema refreshed.", "success");
+    } catch {
+      toast("Failed to refresh schema.", "error");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const tableNames = useMemo(() => Object.keys(tables), [tables]);
-  const filtered = useMemo(
-    () => tableNames.filter((t) => !search || t.toLowerCase().includes(search.toLowerCase())),
-    [tableNames, search]
+  const filteredTables = useMemo(
+    () => tableNames.filter((t) => !tableSearch || t.toLowerCase().includes(tableSearch.toLowerCase())),
+    [tableNames, tableSearch]
   );
+
+  const selectedCols = useMemo(() => {
+    if (!selected || !tables[selected]) return [];
+    const entries = Object.entries(tables[selected]) as [string, any][];
+    if (!colSearch) return entries;
+    return entries.filter(([col]) => col.toLowerCase().includes(colSearch.toLowerCase()));
+  }, [selected, tables, colSearch]);
+
+  const hasSamples = useMemo(() => {
+    if (!selected || !tables[selected]) return false;
+    return Object.values(tables[selected]).some((m: any) => m?.samples?.length > 0);
+  }, [selected, tables]);
+
+  const copyDDL = () => {
+    if (!selected || !tables[selected]) return;
+    const cols = Object.entries(tables[selected]).map(([col, meta]: [string, any]) => {
+      const type = typeof meta === "string" ? meta : (meta.type || "text");
+      const notNull = meta.nullable === false ? " NOT NULL" : "";
+      const pk = meta.is_pk ? " PRIMARY KEY" : "";
+      return `  ${col} ${type.toUpperCase()}${pk}${notNull}`;
+    });
+    navigator.clipboard.writeText(`CREATE TABLE "${selected}" (\n${cols.join(",\n")}\n);`);
+    toast("CREATE TABLE copied", "success");
+  };
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -201,15 +249,27 @@ function SchemaView() {
         <div className="flex-shrink-0 px-4 py-3.5 border-b border-border space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-widest text-content-3">Tables</span>
-            {tableNames.length > 0 && (
-              <span className="text-[11px] text-content-3">{filtered.length} / {tableNames.length}</span>
-            )}
+            <div className="flex items-center gap-2">
+              {tableNames.length > 0 && (
+                <span className="text-[11px] text-content-3">{filteredTables.length} / {tableNames.length}</span>
+              )}
+              {activeConnectionId && (
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing || loading}
+                  title="Refresh schema"
+                  className="h-5 w-5 flex items-center justify-center rounded text-content-3 hover:text-content-1 hover:bg-base-3 transition-colors disabled:opacity-40"
+                >
+                  <RotateCcw className={["h-3 w-3", refreshing ? "animate-spin" : ""].join(" ")} />
+                </button>
+              )}
+            </div>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-content-3 pointer-events-none" />
             <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={tableSearch}
+              onChange={(e) => setTableSearch(e.target.value)}
               placeholder="Filter tables…"
               className="w-full h-8 pl-8 pr-3 rounded-lg text-[12px] text-content-1 placeholder:text-content-3 outline-none"
               style={{ background: "var(--ds-base-0)", border: "1px solid var(--ds-border-subtle)", boxShadow: "var(--ds-shadow-inset)" }}
@@ -224,16 +284,16 @@ function SchemaView() {
             </div>
           ) : !activeConnectionId ? (
             <p className="text-[12px] text-content-3 px-3 py-3">No database connected.</p>
-          ) : filtered.length === 0 ? (
-            <p className="text-[12px] text-content-3 px-3 py-3">{search ? "No matching tables." : "No tables found."}</p>
+          ) : filteredTables.length === 0 ? (
+            <p className="text-[12px] text-content-3 px-3 py-3">{tableSearch ? "No matching tables." : "No tables found."}</p>
           ) : (
-            filtered.map((tbl) => {
+            filteredTables.map((tbl) => {
               const colCount = Object.keys(tables[tbl] || {}).length;
               const isActive = selected === tbl;
               return (
                 <button
                   key={tbl}
-                  onClick={() => setSelected(tbl)}
+                  onClick={() => { setSelected(tbl); setColSearch(""); }}
                   className={[
                     "w-full text-left px-3 py-2 rounded-lg flex items-center justify-between gap-2 transition-colors",
                     isActive ? "bg-brand-subtle" : "hover:bg-base-2",
@@ -266,14 +326,30 @@ function SchemaView() {
           <>
             {/* Detail header */}
             <div
-              className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border"
+              className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-border gap-4"
               style={{ background: "var(--ds-base-1)" }}
             >
-              <div>
-                <h3 className="text-[15px] font-semibold font-mono text-content-1">{selected}</h3>
-                <p className="text-[12px] text-content-3 mt-0.5">{Object.keys(tables[selected]).length} columns</p>
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-semibold font-mono text-content-1 truncate">{selected}</h3>
+                <p className="text-[12px] text-content-3 mt-0.5">
+                  {Object.keys(tables[selected]).length} columns
+                  {colSearch && selectedCols.length !== Object.keys(tables[selected]).length && (
+                    <span className="ml-1">· {selectedCols.length} shown</span>
+                  )}
+                </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                {/* Column search */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-content-3 pointer-events-none" />
+                  <input
+                    value={colSearch}
+                    onChange={(e) => setColSearch(e.target.value)}
+                    placeholder="Filter columns…"
+                    className="h-7 pl-6 pr-2.5 rounded-lg text-[12px] w-36 text-content-1 placeholder:text-content-3 outline-none transition-colors"
+                    style={{ background: "var(--ds-base-0)", border: "1px solid var(--ds-border-subtle)" }}
+                  />
+                </div>
                 <Button
                   variant="outline" size="sm"
                   onClick={() => { navigator.clipboard.writeText(selected); toast("Copied table name", "success"); }}
@@ -284,72 +360,112 @@ function SchemaView() {
                 </Button>
                 <Button
                   variant="outline" size="sm"
-                  onClick={() => { navigator.clipboard.writeText(`SELECT * FROM "${selected}" LIMIT 100;`); toast("Copied SELECT", "success"); }}
+                  onClick={copyDDL}
                   className="h-7 gap-1.5 px-2.5 text-[11px]"
                 >
                   <Copy className="h-3 w-3" />
-                  Copy SELECT
+                  DDL
                 </Button>
+                {onQueryTable && (
+                  <Button
+                    size="sm"
+                    onClick={() => onQueryTable(selected)}
+                    className="h-7 gap-1.5 px-2.5 text-[11px]"
+                  >
+                    <Play className="h-3 w-3" />
+                    Query table
+                  </Button>
+                )}
               </div>
             </div>
 
             {/* Column table */}
             <div className="flex-1 min-h-0 overflow-auto custom-scrollbar">
-              <table className="w-full text-left text-[12px] border-collapse">
-                <thead className="sticky top-0 z-10">
-                  <tr style={{ background: "var(--ds-base-2)", borderBottom: "1px solid var(--ds-border-subtle)" }}>
-                    {["Column", "Type", "Key / Reference", "Nullable"].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-[11px] font-semibold text-content-3 whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(tables[selected]).map(([col, meta]: [string, any]) => {
-                    const typeStr = typeof meta === "string" ? meta : (meta.type || "");
-                    const typeStyle = schemaTypeStyle(typeStr);
-                    const isPk = meta.is_pk;
-                    const fkTarget = meta.fk_target;
-                    const isNotNull = meta.nullable === false;
-                    return (
-                      <tr key={col} className="hover:bg-base-1 transition-colors border-b border-[var(--ds-border-subtle)]">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[12px] font-semibold text-content-1">{col}</span>
-                            {isPk && (
-                              <span className="text-[9px] font-bold px-1 py-0.5 rounded"
-                                style={{ background: "var(--ds-warning-muted)", color: "var(--ds-warning)", border: "1px solid var(--ds-warning-border)" }}>
-                                PK
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center font-mono text-[11px] font-medium px-2 py-0.5 rounded-md" style={typeStyle}>
-                            {typeStr || "—"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {fkTarget ? (
-                            <span className="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded-md"
-                              style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.18)" }}>
-                              → {fkTarget}
+              {selectedCols.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <p className="text-[13px] text-content-3">No columns match "{colSearch}"</p>
+                </div>
+              ) : (
+                <table className="w-full text-left text-[12px] border-collapse">
+                  <thead className="sticky top-0 z-10">
+                    <tr style={{ background: "var(--ds-base-2)", borderBottom: "1px solid var(--ds-border-subtle)" }}>
+                      {["Column", "Type", "Key / Reference", "Nullable", ...(hasSamples ? ["Sample Values"] : [])].map((h) => (
+                        <th key={h} className="px-4 py-2.5 text-[11px] font-semibold text-content-3 whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedCols.map(([col, meta]) => {
+                      const typeStr = typeof meta === "string" ? meta : (meta.type || "");
+                      const typeStyle = schemaTypeStyle(typeStr);
+                      const isPk = meta.is_pk;
+                      const fkTarget = meta.fk_target;
+                      const isNotNull = meta.nullable === false;
+                      const samples: string[] = meta.samples || [];
+                      return (
+                        <tr key={col} className="hover:bg-base-1 transition-colors border-b border-[var(--ds-border-subtle)]">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[12px] font-semibold text-content-1">{col}</span>
+                              {isPk && (
+                                <span className="text-[9px] font-bold px-1 py-0.5 rounded"
+                                  style={{ background: "var(--ds-warning-muted)", color: "var(--ds-warning)", border: "1px solid var(--ds-warning-border)" }}>
+                                  PK
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center font-mono text-[11px] font-medium px-2 py-0.5 rounded-md" style={typeStyle}>
+                              {typeStr || "—"}
                             </span>
-                          ) : (
-                            <span className="text-content-3 text-[12px]">—</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {fkTarget ? (
+                              <span className="inline-flex items-center gap-1 font-mono text-[11px] font-medium px-2 py-0.5 rounded-md"
+                                style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "1px solid rgba(124,58,237,0.18)" }}>
+                                → {fkTarget}
+                              </span>
+                            ) : (
+                              <span className="text-content-3 text-[12px]">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isNotNull ? (
+                              <span className="text-[11px] font-mono font-medium text-content-3">NOT NULL</span>
+                            ) : (
+                              <span className="text-[11px] italic text-content-3">nullable</span>
+                            )}
+                          </td>
+                          {hasSamples && (
+                            <td className="px-4 py-3">
+                              {samples.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {samples.slice(0, 5).map((v) => (
+                                    <span
+                                      key={v}
+                                      className="inline-block font-mono text-[10px] px-1.5 py-0.5 rounded max-w-[120px] truncate"
+                                      style={{ background: "var(--ds-base-3)", color: "var(--ds-text-2)", border: "1px solid var(--ds-border-subtle)" }}
+                                      title={v}
+                                    >
+                                      {v}
+                                    </span>
+                                  ))}
+                                  {samples.length > 5 && (
+                                    <span className="text-[10px] text-content-3 self-center">+{samples.length - 5}</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-content-3 text-[12px]">—</span>
+                              )}
+                            </td>
                           )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {isNotNull ? (
-                            <span className="text-[11px] font-mono font-medium text-content-3">NOT NULL</span>
-                          ) : (
-                            <span className="text-[11px] italic text-content-3">nullable</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           </>
         ) : (

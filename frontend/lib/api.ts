@@ -103,6 +103,11 @@ export const searchSchema = async (connectionId: number, query: string) => {
   return res.data;
 };
 
+export const refreshSchema = async (connectionId: number) => {
+  const res = await api.post(`/schema/${connectionId}/refresh`);
+  return res.data;
+};
+
 // ── Voice ────────────────────────────────────────────────────────────────────
 
 export const transcribeAudio = async (audioFile: File) => {

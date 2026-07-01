@@ -18,6 +18,7 @@ import {
   SquarePen,
   Loader2,
   MessageSquare,
+  Search,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -94,6 +95,7 @@ export const Sidebar = ({
   const [activeMenuConnId, setActiveMenuConnId] = useState<number | null>(null);
   const [testingConnId, setTestingConnId] = useState<number | null>(null);
   const [testResults, setTestResults] = useState<Record<number, 'ok' | 'fail'>>({});
+  const [sessionSearch, setSessionSearch] = useState('');
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -413,39 +415,63 @@ export const Sidebar = ({
             <div className="h-px bg-border mx-1 my-1" />
             <div className="space-y-0.5">
               {!collapsed && (
-                <p className="px-3 pb-1 pt-0.5 text-[10.5px] font-semibold text-content-3 tracking-wider uppercase select-none">
-                  Recents
-                </p>
+                <>
+                  <p className="px-3 pb-1 pt-0.5 text-[10.5px] font-semibold text-content-3 tracking-wider uppercase select-none">
+                    Recents
+                  </p>
+                  {sessions.length > 4 && (
+                    <div className="px-2 pb-1 relative">
+                      <Search className="absolute left-4.5 top-1/2 -translate-y-1/2 h-3 w-3 text-content-3 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={sessionSearch}
+                        onChange={e => setSessionSearch(e.target.value)}
+                        placeholder="Search history…"
+                        className="w-full h-7 pl-6 pr-2 rounded-md text-[12px] bg-base-2 text-content-1 placeholder:text-content-3 outline-none border border-transparent focus:border-[var(--ds-border-accent)] transition-colors duration-[100ms]"
+                      />
+                    </div>
+                  )}
+                </>
               )}
-              {sessions.map((session) => {
-                const isActive = session.id === activeSessionId;
-                return (
-                  <Tooltip key={session.id} label={session.title} side="right" disabled={!collapsed}>
-                    <button
-                      type="button"
-                      onClick={() => onRestoreSession(session.id)}
-                      className={[
-                        'flex items-center w-full rounded-md transition-colors duration-[100ms] select-none',
-                        collapsed ? 'justify-center h-9 px-0' : 'gap-2.5 px-3 py-2',
-                        isActive
-                          ? 'bg-base-3 text-content-1'
-                          : 'text-content-2 hover:bg-base-2 hover:text-content-1',
-                      ].join(' ')}
-                    >
-                      <MessageSquare className={['h-3.5 w-3.5 flex-shrink-0 shrink-0', isActive ? 'text-brand' : 'text-content-3'].join(' ')} />
-                      {!collapsed && (
-                        <span className="flex flex-col items-start min-w-0 flex-1">
-                          <span className={['truncate text-[12.5px] leading-snug w-full text-left', isActive ? 'font-medium' : ''].join(' ')}>{session.title}</span>
-                          <span className="text-[10.5px] text-content-3 leading-tight">
-                            {relativeTime(session.updatedAt)}
-                            {session.queries.length > 1 && ` · ${session.queries.length} queries`}
+              {(() => {
+                const filtered = sessionSearch.trim()
+                  ? sessions.filter(s => s.title.toLowerCase().includes(sessionSearch.toLowerCase()))
+                  : sessions;
+                if (filtered.length === 0) {
+                  return !collapsed ? (
+                    <p className="px-3 py-2 text-[12px] text-content-3">No sessions match "{sessionSearch}"</p>
+                  ) : null;
+                }
+                return filtered.map((session) => {
+                  const isActive = session.id === activeSessionId;
+                  return (
+                    <Tooltip key={session.id} label={session.title} side="right" disabled={!collapsed}>
+                      <button
+                        type="button"
+                        onClick={() => onRestoreSession(session.id)}
+                        className={[
+                          'flex items-center w-full rounded-md transition-colors duration-[100ms] select-none',
+                          collapsed ? 'justify-center h-9 px-0' : 'gap-2.5 px-3 py-2',
+                          isActive
+                            ? 'bg-base-3 text-content-1'
+                            : 'text-content-2 hover:bg-base-2 hover:text-content-1',
+                        ].join(' ')}
+                      >
+                        <MessageSquare className={['h-3.5 w-3.5 flex-shrink-0 shrink-0', isActive ? 'text-brand' : 'text-content-3'].join(' ')} />
+                        {!collapsed && (
+                          <span className="flex flex-col items-start min-w-0 flex-1">
+                            <span className={['truncate text-[12.5px] leading-snug w-full text-left', isActive ? 'font-medium' : ''].join(' ')}>{session.title}</span>
+                            <span className="text-[10.5px] text-content-3 leading-tight">
+                              {relativeTime(session.updatedAt)}
+                              {session.queries.length > 1 && ` · ${session.queries.length} queries`}
+                            </span>
                           </span>
-                        </span>
-                      )}
-                    </button>
-                  </Tooltip>
-                );
-              })}
+                        )}
+                      </button>
+                    </Tooltip>
+                  );
+                });
+              })()}
             </div>
           </>
         )}

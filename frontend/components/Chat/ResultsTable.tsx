@@ -10,6 +10,8 @@ import {
   Rows3,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'motion/react';
@@ -97,6 +99,7 @@ export function ResultsTable({ data, executionTime, className = '' }: ResultsTab
   const [fullscreen, setFullscreen] = useState(false);
   const [page, setPage] = useState(0);
   const [mainEl, setMainEl] = useState<Element | null>(null);
+  const [tsvCopied, setTsvCopied] = useState(false);
 
   useEffect(() => { setMainEl(document.querySelector('main')); }, []);
 
@@ -109,6 +112,33 @@ export function ResultsTable({ data, executionTime, className = '' }: ResultsTab
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
   const totalPages = Math.ceil(data.length / PAGE_SIZE);
+
+  const copyTSV = useCallback(async () => {
+    if (!data.length) return;
+    const header = columns.join('\t');
+    const rows = data.map(r =>
+      columns.map(c => {
+        const v = r[c];
+        return v === null || v === undefined ? '' : String(v);
+      }).join('\t')
+    );
+    try {
+      await navigator.clipboard.writeText([header, ...rows].join('\n'));
+      setTsvCopied(true);
+      setTimeout(() => setTsvCopied(false), 2000);
+    } catch {}
+  }, [data, columns]);
+
+  const downloadJSON = useCallback(() => {
+    if (!data.length) return;
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'intelliquery_results.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [data]);
 
   const downloadCSV = useCallback(() => {
     if (!data.length) return;
@@ -157,7 +187,17 @@ export function ResultsTable({ data, executionTime, className = '' }: ResultsTab
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={copyTSV}
+            className="h-7 gap-1.5 px-2.5 text-[11px]"
+            title="Copy as TSV — paste into Excel or Google Sheets"
+          >
+            {tsvCopied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+            {tsvCopied ? 'Copied!' : 'Copy'}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -166,6 +206,15 @@ export function ResultsTable({ data, executionTime, className = '' }: ResultsTab
           >
             <Download className="h-3.5 w-3.5" />
             CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={downloadJSON}
+            className="h-7 gap-1.5 px-2.5 text-[11px]"
+          >
+            <Download className="h-3.5 w-3.5" />
+            JSON
           </Button>
           <Button
             variant="outline"
@@ -256,9 +305,17 @@ export function ResultsTable({ data, executionTime, className = '' }: ResultsTab
               </span>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={copyTSV} className="h-8 gap-1.5 px-3 text-[12px]" title="Copy as TSV">
+                {tsvCopied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+                {tsvCopied ? 'Copied!' : 'Copy'}
+              </Button>
               <Button variant="outline" size="sm" onClick={downloadCSV} className="h-8 gap-1.5 px-3 text-[12px]">
                 <Download className="h-3.5 w-3.5" />
-                Download CSV
+                CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={downloadJSON} className="h-8 gap-1.5 px-3 text-[12px]">
+                <Download className="h-3.5 w-3.5" />
+                JSON
               </Button>
               <button
                 onClick={() => setFullscreen(false)}
