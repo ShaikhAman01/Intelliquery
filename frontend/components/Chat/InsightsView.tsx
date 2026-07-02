@@ -24,12 +24,22 @@ type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'kpi' | 'table';
 type Tab = 'overview' | 'chart' | 'data' | 'sql';
 type ColType = 'number' | 'date' | 'string';
 
+/** Grounded LLM analysis returned by the backend as `visualization`. */
+export interface AIInsights {
+  summary?: string;
+  key_patterns?: string[];
+  anomalies?: string[];
+  business_implications?: string;
+  recommendations?: string[];
+}
+
 interface InsightsViewProps {
   sql: string;
   explanation: string;
   data: Record<string, unknown>[];
   chartRec?: { chart_type: ChartType; reason?: string };
   executionTime?: number;
+  insights?: AIInsights;
 }
 
 interface ColStats {
@@ -228,7 +238,7 @@ function ColSelector({ label, columns, value, onChange }: { label: string; colum
 
 /* ─── main ──────────────────────────────────────────────────── */
 
-export function InsightsView({ sql, explanation, data, chartRec, executionTime }: InsightsViewProps) {
+export function InsightsView({ sql, explanation, data, chartRec, executionTime, insights }: InsightsViewProps) {
   const [tab, setTab] = useState<Tab>('overview');
 
   const stats        = useMemo(() => computeStats(data), [data]);
@@ -277,6 +287,11 @@ export function InsightsView({ sql, explanation, data, chartRec, executionTime }
       '',
       '## AI Analysis',
       explanation,
+      ...(insights?.summary ? ['', '### Key Finding', insights.summary] : []),
+      ...(insights?.key_patterns?.length ? ['', '### Key Patterns', ...insights.key_patterns.map(p => `- ${p}`)] : []),
+      ...(insights?.anomalies?.length ? ['', '### Anomalies', ...insights.anomalies.map(a => `- ${a}`)] : []),
+      ...(insights?.business_implications ? ['', '### Business Implications', insights.business_implications] : []),
+      ...(insights?.recommendations?.length ? ['', '### Recommendations', ...insights.recommendations.map(r => `- ${r}`)] : []),
       '',
       '## Key Metrics',
       ...kpis.map(k => `- **${k.label}**: ${k.value}${k.sub ? ` (${k.sub})` : ''}`),
@@ -383,8 +398,10 @@ export function InsightsView({ sql, explanation, data, chartRec, executionTime }
             ))}
           </div>
 
-          {/* AI Analysis */}
-          {(explanation || observations.length > 0) && (
+          {/* AI Analysis — the deep dive. The chat card already shows the key
+              finding (insights.summary); here we show how the question was
+              answered plus anomalies, business context, and next steps. */}
+          {(explanation || insights || observations.length > 0) && (
             <div className="rounded-xl border border-border overflow-hidden" style={{ background: 'var(--ds-base-1)' }}>
               <div className="flex items-center gap-2 px-4 py-3 border-b border-border" style={{ background: 'var(--ds-base-2)' }}>
                 <Sparkles className="h-3.5 w-3.5 text-brand flex-shrink-0" />
@@ -393,13 +410,45 @@ export function InsightsView({ sql, explanation, data, chartRec, executionTime }
               <div className="p-4 space-y-4">
                 {explanation && (
                   <div className="space-y-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ds-text-3)' }}>Summary</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ds-text-3)' }}>What this query does</p>
                     <p className="text-[14px] leading-relaxed text-content-2">{explanation}</p>
+                  </div>
+                )}
+                {(insights?.anomalies?.length ?? 0) > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ds-text-3)' }}>Anomalies</p>
+                    <ul className="space-y-1.5">
+                      {insights!.anomalies!.map((a, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[13px] text-content-2">
+                          <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-px" style={{ color: '#d97706' }} />
+                          {a}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {insights?.business_implications && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ds-text-3)' }}>Business Implications</p>
+                    <p className="text-[14px] leading-relaxed text-content-2">{insights.business_implications}</p>
+                  </div>
+                )}
+                {(insights?.recommendations?.length ?? 0) > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ds-text-3)' }}>Recommended Next Steps</p>
+                    <ul className="space-y-1.5">
+                      {insights!.recommendations!.map((r, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[13px] text-content-2">
+                          <span className="mt-[3px] h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--ds-success)' }} />
+                          {r}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
                 {observations.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ds-text-3)' }}>Key Observations</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ds-text-3)' }}>Data Observations</p>
                     <ul className="space-y-1.5">
                       {observations.map((obs, i) => (
                         <li key={i} className="flex items-start gap-2 text-[13px] text-content-2">

@@ -12,7 +12,7 @@ import { useStore } from '@/lib/store';
 import { sendQuery, executeSQL, getSchema, createSampleConnection } from '@/lib/api';
 import { useToast } from '@/components/ui/toaster';
 import { ResultsTable } from '@/components/Chat/ResultsTable';
-import { InsightsView } from '@/components/Chat/InsightsView';
+import { InsightsView, type AIInsights } from '@/components/Chat/InsightsView';
 import { Button } from '@/components/ui/button';
 import {
   Play,
@@ -49,6 +49,7 @@ interface ChatMessage {
   userQuery: string;
   sql?: string;
   explanation?: string;
+  insights?: AIInsights;
   chartRec?: { chart_type: ChartType; reason?: string };
   data?: Record<string, unknown>[];
   executionTime?: number;
@@ -160,14 +161,15 @@ const CHART_LABELS: Record<string, string> = {
 
 interface AIResponseCardProps {
   explanation: string;
+  insights?: AIInsights;
   data: Record<string, unknown>[];
   sql: string;
   chartRec?: { chart_type: string; reason?: string };
   onFollowUp?: (q: string) => void;
 }
 
-function AIResponseCard({ explanation, data, sql, chartRec, onFollowUp }: AIResponseCardProps) {
-  const observations = useMemo(() => {
+function AIResponseCard({ explanation, insights, data, sql, chartRec, onFollowUp }: AIResponseCardProps) {
+  const computedObservations = useMemo(() => {
     if (!data.length) return [];
     const cols = Object.keys(data[0]);
     const obs: string[] = [];
@@ -196,6 +198,14 @@ function AIResponseCard({ explanation, data, sql, chartRec, onFollowUp }: AIResp
     return obs;
   }, [data]);
 
+  // The chat card leads with the *finding* (grounded LLM summary of the
+  // results); "what the SQL does" lives in the Insights deep dive. LLM
+  // key patterns beat the locally computed row/column stats when present.
+  const summaryText = insights?.summary || explanation;
+  const observations = insights?.key_patterns?.length
+    ? insights.key_patterns
+    : computedObservations;
+
   const followUps = useMemo(() => {
     const q: string[] = [];
     const up = sql.toUpperCase();
@@ -215,13 +225,13 @@ function AIResponseCard({ explanation, data, sql, chartRec, onFollowUp }: AIResp
       className="rounded-xl overflow-hidden text-[13px]"
       style={{ background: 'var(--ds-base-1)', border: '1px solid var(--ds-border-subtle)' }}
     >
-      {/* Summary */}
-      {explanation && (
+      {/* Summary — the key finding from the results */}
+      {summaryText && (
         <div className="px-4 py-3.5 border-b border-border">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-content-3 mb-2 flex items-center gap-1.5">
             <Sparkles className="h-3 w-3 text-brand" /> Summary
           </p>
-          <p className="leading-relaxed text-content-2">{explanation}</p>
+          <p className="leading-relaxed text-content-2">{summaryText}</p>
         </div>
       )}
 
@@ -402,6 +412,7 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect, onRetry
               {(msg.explanation || (msg.data && msg.data.length > 0)) && (
                 <AIResponseCard
                   explanation={msg.explanation ?? ''}
+                  insights={msg.insights}
                   data={msg.data ?? []}
                   sql={msg.sql!}
                   chartRec={msg.chartRec}
@@ -629,6 +640,7 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect, onRetry
                     <InsightsView
                       sql={msg.sql!}
                       explanation={msg.explanation ?? ''}
+                      insights={msg.insights}
                       data={msg.data}
                       chartRec={msg.chartRec}
                       executionTime={msg.executionTime}
@@ -997,6 +1009,7 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
       updateMessage(id, {
         sql: successSql,
         explanation: result.explanation || '',
+        insights: result.visualization || undefined,
         data: result.data || [],
         chartRec: result.chart_recommendation,
         executionTime: result.execution_time_ms,
