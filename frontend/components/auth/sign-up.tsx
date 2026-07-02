@@ -1,11 +1,13 @@
 'use client';
 
-import { useTransition, useState } from 'react';
+import { useTransition, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
+import { useSession } from '@/lib/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordStrength } from '@/components/auth/password-strength';
 import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -14,18 +16,32 @@ export default function SignUp() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/';
 
+  /* Already signed in? Skip the form entirely. */
+  const { session, isLoading: sessionLoading } = useSession();
+  useEffect(() => {
+    if (!sessionLoading && session) router.replace(redirectTo);
+  }, [sessionLoading, session, router, redirectTo]);
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const passwordOk = password.length >= 8;
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!passwordOk) return;
     setError(null);
     startTransition(async () => {
-      const { error } = await authClient.signUp.email({ email, password, name });
+      // callbackURL: where the verification-email link lands after confirming
+      const { error } = await authClient.signUp.email({
+        email, password, name,
+        callbackURL: '/verify-email',
+      });
       if (error) {
         setError(error.message || 'Something went wrong. Please try again.');
       } else {
@@ -35,7 +51,20 @@ export default function SignUp() {
   };
 
   const handleGoogleSignIn = async () => {
-    await authClient.signIn.social({ provider: 'google', callbackURL: redirectTo });
+    if (googleLoading) return;
+    setGoogleLoading(true);
+    setError(null);
+    try {
+      const { error } = await authClient.signIn.social({ provider: 'google', callbackURL: redirectTo });
+      if (error) {
+        setError(error.message || 'Google sign-up failed. Please try again.');
+        setGoogleLoading(false);
+      }
+      // On success the browser redirects to Google — keep the spinner running.
+    } catch {
+      setError('Could not reach Google. Check your connection and try again.');
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -92,6 +121,7 @@ export default function SignUp() {
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
+          <PasswordStrength password={password} />
         </div>
 
         {error && (
@@ -108,7 +138,11 @@ export default function SignUp() {
           </div>
         )}
 
-        <Button type="submit" disabled={isPending} className="w-full h-11 font-semibold text-[14px]">
+        <Button
+          type="submit"
+          disabled={isPending || googleLoading || (password.length > 0 && !passwordOk)}
+          className="w-full h-11 font-semibold text-[14px]"
+        >
           {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
           Create account
         </Button>
@@ -129,8 +163,10 @@ export default function SignUp() {
         variant="outline"
         type="button"
         onClick={handleGoogleSignIn}
+        disabled={googleLoading || isPending}
         className="w-full h-11 gap-2.5 text-[14px]"
       >
+        {googleLoading && <Loader2 className="h-4 w-4 animate-spin" />}
         <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
           <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>

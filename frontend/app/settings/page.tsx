@@ -282,11 +282,32 @@ function ChangePasswordSection() {
 
 /* ── Profile tab ─────────────────────────────────────────── */
 
-function ProfileTab({ user }: { user: { id?: string; name?: string | null; email?: string | null; role?: string | null; image?: string | null } | null | undefined }) {
+function ProfileTab({ user }: { user: { id?: string; name?: string | null; email?: string | null; role?: string | null; image?: string | null; emailVerified?: boolean } | null | undefined }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.name || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  /* Email verification state + resend */
+  const isVerified = !!user?.emailVerified;
+  const [resending, setResending] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const handleResendVerification = async () => {
+    if (!user?.email || resending) return;
+    setResending(true);
+    setVerifyMsg(null);
+    const { error } = await (authClient as any).sendVerificationEmail({
+      email: user.email,
+      callbackURL: '/verify-email',
+    });
+    setResending(false);
+    setVerifyMsg(
+      error
+        ? { text: error.message || 'Failed to send verification email.', type: 'error' }
+        : { text: `Verification email sent to ${user.email}. Check your inbox.`, type: 'success' }
+    );
+  };
 
   const initial = (user?.name?.[0] || user?.email?.[0] || 'U').toUpperCase();
   const shortId = user?.id ? user.id.replace(/-/g, '').slice(-8).toUpperCase() : '—';
@@ -392,6 +413,17 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
               label: 'Email address',
               value: user?.email || '—',
               note: 'Used for sign-in and account notifications.',
+              suffix: isVerified ? (
+                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                  style={{ background: 'var(--ds-success-muted)', color: 'var(--ds-success)', border: '1px solid var(--ds-success-border)' }}>
+                  <Check className="h-3 w-3" /> Verified
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                  style={{ background: 'var(--ds-warning-muted)', color: 'var(--ds-warning)', border: '1px solid var(--ds-warning-border)' }}>
+                  <AlertCircle className="h-3 w-3" /> Unverified
+                </span>
+              ),
             },
             ...(roleLabel ? [{
               label: 'Role',
@@ -427,6 +459,29 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
             </div>
           ))}
         </div>
+
+        {/* Unverified email — nudge with one-click resend */}
+        {!isVerified && (
+          <div
+            className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg px-3.5 py-3"
+            style={{ background: 'var(--ds-warning-muted)', border: '1px solid var(--ds-warning-border)' }}
+          >
+            <p className="text-[13px] text-content-2">
+              Verify your email to keep your account secure and recoverable.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResendVerification}
+              disabled={resending}
+              className="h-8 gap-1.5 text-[12px] flex-shrink-0"
+            >
+              {resending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+              {resending ? 'Sending…' : 'Send verification email'}
+            </Button>
+          </div>
+        )}
+        {verifyMsg && <div className="mt-3"><StatusMessage message={verifyMsg.text} type={verifyMsg.type} /></div>}
       </Section>
 
       <ChangePasswordSection />

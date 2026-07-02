@@ -10,6 +10,7 @@ interface User {
     email: string;
     name: string;
     image?: string | null;
+    emailVerified?: boolean;
 }
 
 interface Session {
