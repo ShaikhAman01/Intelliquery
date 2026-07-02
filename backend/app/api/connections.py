@@ -182,6 +182,79 @@ def create_connection(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/sample")
+def create_sample_connection(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_editor),
+):
+    """
+    Connect the current user to the built-in sample e-commerce database.
+
+    Idempotent: if the user (or their org) already has a sample connection,
+    it is re-activated and returned instead of creating a duplicate. The
+    underlying SQLite file is generated on first use and shared read-only
+    across all users — the SQL executor only allows SELECT statements.
+    """
+    from app.core.sample_db import ensure_sample_db, SAMPLE_CONNECTION_NAME
+
+    try:
+        db_path = ensure_sample_db()
+
+        scope = (
+            db.query(DbConnection).filter(DbConnection.org_id == current_user.org_id)
+            if current_user.org_id
+            else db.query(DbConnection).filter(DbConnection.user_id == current_user.id)
+        )
+        existing = scope.filter(
+            DbConnection.db_type == "sqlite",
+            DbConnection.db_name == db_path,
+        ).first()
+
+        if existing:
+            if not existing.is_active:
+                existing.is_active = True
+                db.commit()
+                db.refresh(existing)
+            connection = existing
+        else:
+            connection = DbConnection(
+                user_id=current_user.id,
+                org_id=current_user.org_id,
+                name=SAMPLE_CONNECTION_NAME,
+                db_type="sqlite",
+                host="local",
+                port="",
+                username="",
+                encrypted_password=encrypt_password(""),
+                db_name=db_path,
+                use_ssl=False,
+                is_active=True,
+            )
+            connection.cached_schema = mapper.sync_schema(connection)
+            db.add(connection)
+            db.commit()
+            db.refresh(connection)
+            logger.info(f"Sample connection created for user {current_user.email}")
+
+        return {
+            "id": connection.id,
+            "name": connection.name,
+            "db_type": connection.db_type,
+            "host": connection.host,
+            "port": connection.port,
+            "username": connection.username,
+            "db_name": connection.db_name,
+            "use_ssl": connection.use_ssl,
+            "is_active": connection.is_active,
+            "already_existed": existing is not None,
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Sample connection failed: {e}")
+        raise HTTPException(status_code=500, detail="Could not set up the sample database. Please try again.")
+
+
 @router.get("/")
 def list_connections(
     db: Session = Depends(get_db),

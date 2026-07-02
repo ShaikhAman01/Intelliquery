@@ -9,7 +9,7 @@ import {
   KeyboardEvent,
 } from 'react';
 import { useStore } from '@/lib/store';
-import { sendQuery, executeSQL, getSchema } from '@/lib/api';
+import { sendQuery, executeSQL, getSchema, createSampleConnection } from '@/lib/api';
 import { useToast } from '@/components/ui/toaster';
 import { ResultsTable } from '@/components/Chat/ResultsTable';
 import { InsightsView } from '@/components/Chat/InsightsView';
@@ -654,17 +654,20 @@ const FALLBACK_SUGGESTIONS: Suggestion[] = [
   { label: 'Compare sales across regions this month', icon: Zap },
 ];
 
+/* Table names may already be plural (e.g. "customers") — only append "s" when needed */
+const plural = (t: string) => (t.endsWith('s') ? t : `${t}s`);
+
 const TABLE_TEMPLATES: Array<{
   keywords: string[];
   template: (t: string) => string;
   icon: React.ElementType;
 }> = [
   { keywords: ['order', 'sale', 'purchase'], template: t => `Show top 10 ${t} by total amount`, icon: TrendingUp },
-  { keywords: ['customer', 'user', 'client', 'member'], template: t => `Find most active ${t}s this month`, icon: Zap },
-  { keywords: ['product', 'item', 'inventory', 'stock'], template: t => `List ${t}s with the lowest stock`, icon: AlertTriangle },
-  { keywords: ['payment', 'invoice', 'billing', 'transaction'], template: t => `Find pending ${t}s from the last 30 days`, icon: TrendingUp },
+  { keywords: ['customer', 'user', 'client', 'member'], template: t => `Find most active ${plural(t)} this month`, icon: Zap },
+  { keywords: ['product', 'item', 'inventory', 'stock'], template: t => `List ${plural(t)} with the lowest stock`, icon: AlertTriangle },
+  { keywords: ['payment', 'invoice', 'billing', 'transaction'], template: t => `Find pending ${plural(t)} from the last 30 days`, icon: TrendingUp },
   { keywords: ['log', 'event', 'activity', 'audit'], template: t => `Show recent ${t} entries`, icon: Zap },
-  { keywords: ['employee', 'staff', 'team'], template: t => `List ${t}s grouped by department`, icon: Zap },
+  { keywords: ['employee', 'staff', 'team'], template: t => `List ${plural(t)} grouped by department`, icon: Zap },
   { keywords: ['category', 'tag', 'type', 'status'], template: t => `Count records grouped by ${t}`, icon: TrendingUp },
   { keywords: ['report', 'metric', 'stat', 'analytic'], template: t => `Summarize ${t} for this quarter`, icon: TrendingUp },
 ];
@@ -728,11 +731,15 @@ function WelcomeScreen({
   hasConnection,
   hasAnyConnection,
   suggestions,
+  onTrySample,
+  sampleLoading,
 }: {
   onSelect: (text: string) => void;
   hasConnection: boolean;
   hasAnyConnection: boolean;
   suggestions: Suggestion[];
+  onTrySample: () => void;
+  sampleLoading: boolean;
 }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-10 px-4 text-center">
@@ -775,8 +782,19 @@ function WelcomeScreen({
               Connect your first database
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            onClick={onTrySample}
+            disabled={sampleLoading}
+            className="w-full gap-2 h-11 text-[14px] font-medium"
+          >
+            {sampleLoading
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <Database className="h-4 w-4" />}
+            {sampleLoading ? 'Setting up sample data…' : 'Try the sample database'}
+          </Button>
           <p className="text-[12px] text-content-3">
-            Supports PostgreSQL, MySQL, SQLite, SQL Server, MariaDB and more
+            No database handy? The sample is a ready-to-query e-commerce store.
           </p>
         </div>
       ) : !hasConnection ? (
@@ -830,7 +848,7 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete, pendingReplayCached, onReplayCachedConsumed, pendingRestore, onRestoreConsumed }: ChatInterfaceProps = {}) {
-  const { connections, activeConnectionId, setActiveConnection } = useStore();
+  const { connections, activeConnectionId, setActiveConnection, addConnection } = useStore();
   const { toast } = useToast();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -838,6 +856,25 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [connectionSelectorOpen, setConnectionSelectorOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>(FALLBACK_SUGGESTIONS);
+  const [sampleLoading, setSampleLoading] = useState(false);
+
+  /* One-click sample database — the zero-setup onboarding path */
+  const handleTrySample = useCallback(async () => {
+    if (sampleLoading) return;
+    setSampleLoading(true);
+    try {
+      const conn = await createSampleConnection();
+      if (!useStore.getState().connections.some((c) => c.id === conn.id)) {
+        addConnection(conn);
+      }
+      setActiveConnection(conn.id);
+      toast('Sample store connected — ask your first question below!', 'success');
+    } catch {
+      toast('Could not set up the sample database. Please try again.', 'error');
+    } finally {
+      setSampleLoading(false);
+    }
+  }, [sampleLoading, addConnection, setActiveConnection, toast]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1110,7 +1147,14 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
 
           {messages.length === 0 ? (
             <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 280px)' }}>
-              <WelcomeScreen onSelect={handleSuggestion} hasConnection={hasConnection} hasAnyConnection={hasAnyConnection} suggestions={suggestions} />
+              <WelcomeScreen
+                onSelect={handleSuggestion}
+                hasConnection={hasConnection}
+                hasAnyConnection={hasAnyConnection}
+                suggestions={suggestions}
+                onTrySample={handleTrySample}
+                sampleLoading={sampleLoading}
+              />
             </div>
           ) : (
             <div className="space-y-8">

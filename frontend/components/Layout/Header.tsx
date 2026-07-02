@@ -193,20 +193,23 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
             >
               <p className="px-3 py-1.5 text-[10.5px] font-semibold text-content-3 uppercase tracking-wider">Help & Support</p>
               {[
-                { label: 'Documentation', href: '#', Icon: BookOpen },
-                { label: 'Contact Support', href: '#', Icon: MessageCircle },
-                { label: 'Report a Bug', href: '#', Icon: Bug },
-              ].map(({ label, href, Icon }) => (
-                <a
-                  key={label}
-                  href={href}
-                  onClick={closeAll}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-content-2 hover:bg-base-2 hover:text-content-1 transition-colors"
-                >
-                  <Icon className="h-4 w-4 text-content-3 flex-shrink-0" />
-                  {label}
-                </a>
-              ))}
+                { label: 'Documentation', href: '/docs', Icon: BookOpen, external: false },
+                { label: 'Contact Support', href: 'mailto:support@intelliquery.ai', Icon: MessageCircle, external: true },
+                { label: 'Report a Bug', href: 'mailto:support@intelliquery.ai?subject=Bug%20report', Icon: Bug, external: true },
+              ].map(({ label, href, Icon, external }) => {
+                const cls = 'flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-content-2 hover:bg-base-2 hover:text-content-1 transition-colors';
+                return external ? (
+                  <a key={label} href={href} onClick={closeAll} className={cls}>
+                    <Icon className="h-4 w-4 text-content-3 flex-shrink-0" />
+                    {label}
+                  </a>
+                ) : (
+                  <Link key={label} href={href} onClick={closeAll} className={cls}>
+                    <Icon className="h-4 w-4 text-content-3 flex-shrink-0" />
+                    {label}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

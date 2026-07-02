@@ -39,6 +39,12 @@ export const testConnection = async (data: Record<string, unknown>) => {
   return res.data;
 };
 
+/** Connect the built-in sample e-commerce database. Idempotent per user. */
+export const createSampleConnection = async () => {
+  const res = await api.post('/connections/sample');
+  return res.data;
+};
+
 export const testConnectionById = async (id: number) => {
   const res = await api.post(`/connections/${id}/test`);
   return res.data;

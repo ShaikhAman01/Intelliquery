@@ -391,12 +391,7 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
             {
               label: 'Email address',
               value: user?.email || '—',
-              suffix: (
-                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                  style={{ background: 'var(--ds-success-muted)', color: 'var(--ds-success)', border: '1px solid var(--ds-success-border)' }}>
-                  <Check className="h-3 w-3" /> Verified
-                </span>
-              ),
+              note: 'Used for sign-in and account notifications.',
             },
             ...(roleLabel ? [{
               label: 'Role',
@@ -415,8 +410,9 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
               note: 'Provide this when contacting support.',
             },
             {
-              label: 'Authentication',
-              value: 'Managed by your identity provider',
+              label: 'Sign-in methods',
+              value: 'Email & password · Google',
+              note: 'Manage your password below.',
             },
           ].map(({ label, value, suffix, mono, note }) => (
             <div key={label} className="flex items-start justify-between py-3.5 gap-4">

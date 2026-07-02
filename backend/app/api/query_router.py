@@ -238,7 +238,7 @@ async def process_query(
         if not nlp_result.get("is_complex", True):
             try:
                 logger.info("Evaluating query against template engine...")
-                sql_query = dynamic_gen.generate(nlp_result, real_schema_map)
+                sql_query = dynamic_gen.generate(nlp_result, real_schema_map, connection.db_type)
                 if sql_query:
                     source = "DYNAMIC"
             except Exception as e:
@@ -331,6 +331,31 @@ async def process_query(
                     execution_status = "ERROR"
                     error_msg = raw_error
                     logger.error(f"Post-exec repair also failed: {repair_err}")
+
+            # Template-engine or cached SQL failed — evict it so it can't be
+            # replayed, then regenerate from scratch with the LLM. This keeps
+            # heuristic-SQL bugs (e.g. dialect mismatches) from ever surfacing
+            # as raw database errors to the user.
+            elif source in ("DYNAMIC", "SQL_CACHE"):
+                logger.warning(f"{source} SQL failed execution — falling back to LLM: {raw_error}")
+                sql_cache.invalidate(sql_cache_key)
+                try:
+                    conversation_history = _get_conversation_context(db, current_user.id, connection_id)
+                    fallback_sql = await llm.fallback_generate_sql(
+                        user_query, schema_str, connection.db_type,
+                        conversation_history=conversation_history,
+                    )
+                    data = await executor.run_query(fallback_sql, connection, max_rows=max_rows)
+                    sql_query = fallback_sql
+                    source = "LLM_RECOVERED"
+                    sql_cache.set(sql_cache_key, sql_query)
+                    if data:
+                        result_cache.set(make_result_key(connection_id, sql_query), data)
+                    logger.info("LLM recovery after execution failure succeeded.")
+                except Exception as fallback_err:
+                    execution_status = "ERROR"
+                    error_msg = raw_error
+                    logger.error(f"LLM recovery also failed: {fallback_err}")
             else:
                 execution_status = "ERROR"
                 error_msg = raw_error

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createConnection, testConnection } from "@/lib/api";
+import { createConnection, testConnection, createSampleConnection } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "motion/react";
@@ -238,6 +238,26 @@ export default function NewConnectionPage() {
   const [error, setError]     = useState("");
   const [done, setDone]       = useState(false);
   const [copied, setCopied]   = useState(false);
+  const [sampleLoading, setSampleLoading] = useState(false);
+
+  /* One-click sample database — skips the whole wizard */
+  const handleTrySample = async () => {
+    if (sampleLoading) return;
+    setSampleLoading(true);
+    setError("");
+    try {
+      const conn = await createSampleConnection();
+      if (!useStore.getState().connections.some((c) => c.id === conn.id)) {
+        addConnection(conn);
+      }
+      setActiveConnection(conn.id);
+      sessionStorage.setItem("iq_new_connection", "1");
+      router.push("/");
+    } catch (err: any) {
+      setError(extractErrorMessage(err, "Could not set up the sample database. Please try again."));
+      setSampleLoading(false);
+    }
+  };
 
   const [form, setForm] = useState<FormState>({
     name: "", dbType: "postgres", hostType: "cloud", connMethod: "url",
@@ -483,6 +503,35 @@ export default function NewConnectionPage() {
                         </button>
                       );
                     })}
+                  </div>
+
+                  {/* Sample database shortcut */}
+                  <div
+                    className="flex items-center gap-4 rounded-xl px-5 py-4"
+                    style={{ background: "var(--ds-brand-subtle)", border: "1px solid var(--ds-border-accent)" }}
+                  >
+                    <div
+                      className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: "rgba(37,99,235,0.12)" }}
+                    >
+                      <Sparkles className="h-5 w-5 text-brand" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-semibold text-content-1">Just exploring?</p>
+                      <p className="text-[12px] text-content-3 mt-0.5 leading-relaxed">
+                        Skip the setup — query a ready-made sample e-commerce store with customers, orders, and payments.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleTrySample}
+                      disabled={sampleLoading}
+                      className="flex-shrink-0 gap-2 h-9 text-[13px]"
+                    >
+                      {sampleLoading
+                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Setting up…</>
+                        : "Use sample data"}
+                    </Button>
                   </div>
                 </>
               )}

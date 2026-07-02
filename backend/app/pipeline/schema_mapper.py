@@ -96,7 +96,9 @@ class SchemaMapper:
         accurate WHERE clauses without guessing valid enum values.
         """
         db_url = self._build_url(connection_model)
-        engine = create_engine(db_url, connect_args={"connect_timeout": 10})
+        # SQLite's driver rejects connect_timeout; it's a network-DB option
+        connect_args = {} if connection_model.db_type == "sqlite" else {"connect_timeout": 10}
+        engine = create_engine(db_url, connect_args=connect_args)
 
         schema_snapshot = {}
 

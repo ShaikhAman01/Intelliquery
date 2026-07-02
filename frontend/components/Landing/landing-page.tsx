@@ -32,7 +32,18 @@ const FEATURES = [
   },
 ];
 
-const DB_TYPES = ['PostgreSQL', 'MySQL', 'SQLite', 'BigQuery', 'Snowflake', 'SQL Server', 'MariaDB', 'CockroachDB'];
+// `soon: true` engines are visible in the connection wizard but not yet connectable —
+// keep this list in sync with DB_TYPES in app/connections/new/page.tsx
+const DB_TYPES = [
+  { name: 'PostgreSQL' },
+  { name: 'MySQL' },
+  { name: 'SQLite' },
+  { name: 'SQL Server' },
+  { name: 'MariaDB' },
+  { name: 'CockroachDB' },
+  { name: 'BigQuery', soon: true },
+  { name: 'Snowflake', soon: true },
+];
 
 export function LandingPage() {
   return (
@@ -138,13 +149,16 @@ export function LandingPage() {
             className="mt-6 flex flex-wrap items-center justify-center gap-2"
           >
             <span className="text-[11px] text-content-3 mr-1">Works with:</span>
-            {DB_TYPES.map(db => (
+            {DB_TYPES.map(({ name, soon }) => (
               <span
-                key={db}
-                className="rounded-md border border-border px-2.5 py-0.5 text-[11px] font-mono text-content-3"
-                style={{ background: 'var(--ds-base-1)' }}
+                key={name}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-0.5 text-[11px] font-mono text-content-3"
+                style={{ background: 'var(--ds-base-1)', opacity: soon ? 0.65 : 1 }}
               >
-                {db}
+                {name}
+                {soon && (
+                  <span className="text-[9px] font-sans font-semibold uppercase tracking-wide">soon</span>
+                )}
               </span>
             ))}
           </motion.div>
@@ -394,9 +408,9 @@ export function LandingPage() {
             <span className="text-content-3">· © 2025 All rights reserved</span>
           </div>
           <div className="flex items-center gap-5">
-            <a href="#" className="hover:text-content-1 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-content-1 transition-colors">Terms</a>
-            <a href="#" className="hover:text-content-1 transition-colors">Documentation</a>
+            <Link href="/privacy" className="hover:text-content-1 transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-content-1 transition-colors">Terms</Link>
+            <Link href="/docs" className="hover:text-content-1 transition-colors">Documentation</Link>
           </div>
         </div>
       </footer>
