@@ -15,7 +15,8 @@ class Settings(BaseSettings):
 
     # Model selection — override via .env if you want a different model
     OPENAI_MODEL: str = "gpt-4o-mini"
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    # gemini-2.0-flash no longer has free-tier quota — 2.5-flash does
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
     # LLM fallback order (comma-separated): openai,gemini
     LLM_FALLBACK_ORDER: str = "openai,gemini"

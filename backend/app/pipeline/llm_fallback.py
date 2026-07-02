@@ -74,61 +74,46 @@ class OpenAIProvider:
 
 
 class GeminiProvider:
-    """Google Gemini provider."""
+    """Google Gemini provider — uses the google-genai SDK (`from google import genai`)."""
 
     def __init__(self):
-        import google.generativeai as genai
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.client = genai.GenerativeModel(settings.GEMINI_MODEL)
+        from google import genai
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.model = settings.GEMINI_MODEL
         self.name = "gemini"
 
-    def generate_sql(self, messages: list, temperature: float = 0.1) -> str:
-        # Convert OpenAI-style messages to Gemini format
+    def _generate(self, messages: list, temperature: float, max_tokens: int) -> str:
+        """Convert OpenAI-style messages to Gemini format and generate."""
+        from google.genai import types
+
         system_msg = ""
-        chat_messages = []
+        contents = []
         for m in messages:
             if m["role"] == "system":
                 system_msg = m["content"]
             else:
-                chat_messages.append({
-                    "role": "user" if m["role"] == "user" else "model",
-                    "parts": [m["content"]]
-                })
+                contents.append(types.Content(
+                    role="user" if m["role"] == "user" else "model",
+                    parts=[types.Part.from_text(text=m["content"])],
+                ))
 
-        response = self.client.generate_content(
-            contents=chat_messages,
-            generation_config={
-                "temperature": temperature,
-                "top_p": 0.95,
-                "max_output_tokens": 2048,
-            },
-            system_prompt=system_msg if system_msg else None,
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                temperature=temperature,
+                top_p=0.95,
+                max_output_tokens=max_tokens,
+                system_instruction=system_msg or None,
+            ),
         )
-        raw = response.text.strip()
-        return _clean_sql_response(raw)
+        return (response.text or "").strip()
+
+    def generate_sql(self, messages: list, temperature: float = 0.1) -> str:
+        return _clean_sql_response(self._generate(messages, temperature, 2048))
 
     def generate_insights(self, messages: list, temperature: float = 0.5) -> str:
-        system_msg = ""
-        chat_messages = []
-        for m in messages:
-            if m["role"] == "system":
-                system_msg = m["content"]
-            else:
-                chat_messages.append({
-                    "role": "user" if m["role"] == "user" else "model",
-                    "parts": [m["content"]]
-                })
-
-        response = self.client.generate_content(
-            contents=chat_messages,
-            generation_config={
-                "temperature": temperature,
-                "top_p": 0.95,
-                "max_output_tokens": 1024,
-            },
-            system_prompt=system_msg if system_msg else None,
-        )
-        return response.text.strip()
+        return self._generate(messages, temperature, 1024)
 
 
 # ── LLM Service (Fallback Chain) ─────────────────────────────────────────────
