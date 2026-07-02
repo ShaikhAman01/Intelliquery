@@ -27,6 +27,7 @@ import {
   updateOrganization,
   getTeamMembers,
   inviteTeamMember,
+  createInviteLink,
 } from '@/lib/api';
 
 export default function SettingsPage() {
@@ -1112,14 +1113,22 @@ function TeamTab({ orgSlug }: { orgSlug: string | undefined }) {
 
   useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
-  const handleCopyInvite = () => {
+  const handleCopyInvite = async () => {
     if (!orgSlug) {
       setMsg({ text: 'Create an organization first to generate an invite link.', type: 'error' });
       return;
     }
-    navigator.clipboard.writeText(`${window.location.origin}/invite/${orgSlug}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setMsg(null);
+    try {
+      // Link carries the role selected above and can be shared with anyone
+      const data = await createInviteLink(inviteRole);
+      await navigator.clipboard.writeText(data.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setMsg({ text: e.response?.data?.detail || 'Failed to create invite link.', type: 'error' });
+    }
   };
 
   const handleInvite = async () => {
@@ -1177,10 +1186,13 @@ function TeamTab({ orgSlug }: { orgSlug: string | undefined }) {
 
           {msg && <StatusMessage message={msg.text} type={msg.type} />}
 
-          <Button variant="outline" size="sm" onClick={handleCopyInvite} className="gap-2 h-9">
-            {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
-            {copied ? 'Link copied!' : 'Copy invite link'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" size="sm" onClick={handleCopyInvite} className="gap-2 h-9">
+              {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? 'Link copied!' : `Copy ${inviteRole} invite link`}
+            </Button>
+            <p className="text-[12px] text-content-3">Anyone with the link can join with the role selected above.</p>
+          </div>
         </div>
       </Section>
 

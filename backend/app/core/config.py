@@ -24,6 +24,18 @@ class Settings(BaseSettings):
     # Voice / Whisper
     WHISPER_MODEL: str = "whisper-1"
 
+    # Outgoing email (team invites). Same variables the frontend uses;
+    # leave SMTP_HOST empty in dev to log links instead of sending.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_SECURE: bool = False
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    EMAIL_FROM: str = "Intelliquery <noreply@intelliquery.com>"
+
+    # Where invite links point (the Next.js app)
+    FRONTEND_URL: str = "http://localhost:3000"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -2,7 +2,10 @@
 Settings API — Profile, Organization, and Team management.
 """
 
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -11,6 +14,8 @@ from datetime import datetime
 from app.api.deps import get_db
 from app.models.core import User, Organization, OrgInvite
 from app.middleware.auth import get_current_user, require_viewer, require_admin, require_owner
+from app.core.config import settings
+from app.core.emailer import send_email, team_invite_email
 from app.core.logger import logger
 
 router = APIRouter()
@@ -38,6 +43,13 @@ class TeamInvite(BaseModel):
 class RoleUpdate(BaseModel):
     user_id: str
     role: str   # viewer, editor, admin
+
+
+class InviteLink(BaseModel):
+    role: str = "viewer"
+
+
+VALID_ROLES = ["viewer", "editor", "admin"]
 
 
 # ── Profile ──────────────────────────────────────────────────────────────────
@@ -192,51 +204,177 @@ def invite_team_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Send a pending invitation to a user. Requires admin role."""
+    """Email an invitation. The invitee does not need an account yet. Requires admin role."""
     if not current_user.org_id:
         raise HTTPException(status_code=400, detail="Create an organization first.")
 
-    # Find user by email
-    target_user = db.query(User).filter(User.email == data.email).first()
-    if not target_user:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No user found with email '{data.email}'. They must sign up first.",
-        )
+    email = data.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Enter a valid email address.")
 
-    if target_user.org_id == current_user.org_id:
-        raise HTTPException(status_code=400, detail="This user is already in your organization.")
+    if data.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Role must be one of: {VALID_ROLES}")
 
-    if target_user.org_id:
-        raise HTTPException(status_code=400, detail="This user already belongs to another organization.")
+    # If they already have an account, catch memberships early
+    target_user = db.query(User).filter(User.email == email).first()
+    if target_user:
+        if target_user.org_id == current_user.org_id:
+            raise HTTPException(status_code=400, detail="This user is already in your organization.")
+        if target_user.org_id:
+            raise HTTPException(status_code=400, detail="This user already belongs to another organization.")
 
-    # Check for existing pending invite
     existing = db.query(OrgInvite).filter(
-        OrgInvite.invitee_id == target_user.id,
         OrgInvite.org_id == current_user.org_id,
         OrgInvite.status == "pending",
+        OrgInvite.invitee_email == email,
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="An invite is already pending for this user.")
-
-    # Validate role
-    valid_roles = ["viewer", "editor", "admin"]
-    if data.role not in valid_roles:
-        raise HTTPException(status_code=400, detail=f"Role must be one of: {valid_roles}")
+        raise HTTPException(status_code=400, detail="An invite is already pending for this email.")
 
     invite = OrgInvite(
         org_id=current_user.org_id,
         inviter_id=current_user.id,
-        invitee_id=target_user.id,
+        invitee_id=target_user.id if target_user else None,
+        invitee_email=email,
+        token=secrets.token_urlsafe(24),
         role=data.role,
     )
     db.add(invite)
     db.commit()
 
-    logger.info(f"Invite sent to {data.email} for org {current_user.org_id} with role {data.role}")
+    org = db.query(Organization).filter(Organization.id == current_user.org_id).first()
+    invite_url = f"{settings.FRONTEND_URL}/invite/{invite.token}"
+    try:
+        send_email(
+            to=email,
+            subject=f"{current_user.name or 'A teammate'} invited you to {org.name} on Intelliquery",
+            html=team_invite_email(current_user.name or "A teammate", org.name, data.role, invite_url),
+        )
+    except Exception as e:
+        db.delete(invite)
+        db.commit()
+        logger.error(f"Failed to send invite email to {email}: {e}")
+        raise HTTPException(status_code=502, detail="Could not send the invite email. Please try again.")
+
+    logger.info(f"Invite emailed to {email} for org {current_user.org_id} with role {data.role}")
     return {
         "status": "success",
-        "message": f"Invitation sent to {data.email} as {data.role}.",
+        "message": f"Invite emailed to {email}. They'll join as {data.role} when they accept.",
+    }
+
+
+@router.post("/team/invite-link")
+def create_invite_link(
+    data: InviteLink,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Create (or reuse) a shareable invite link with an explicit role. Requires admin role."""
+    if not current_user.org_id:
+        raise HTTPException(status_code=400, detail="Create an organization first.")
+
+    if data.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Role must be one of: {VALID_ROLES}")
+
+    # One reusable link per org+role — creating again returns the same link
+    invite = db.query(OrgInvite).filter(
+        OrgInvite.org_id == current_user.org_id,
+        OrgInvite.status == "pending",
+        OrgInvite.invitee_email.is_(None),
+        OrgInvite.role == data.role,
+        OrgInvite.token.isnot(None),
+    ).first()
+
+    if not invite:
+        invite = OrgInvite(
+            org_id=current_user.org_id,
+            inviter_id=current_user.id,
+            invitee_email=None,
+            token=secrets.token_urlsafe(24),
+            role=data.role,
+        )
+        db.add(invite)
+        db.commit()
+        logger.info(f"Invite link created for org {current_user.org_id} with role {data.role}")
+
+    return {"status": "success", "url": f"{settings.FRONTEND_URL}/invite/{invite.token}", "role": invite.role}
+
+
+@router.get("/team/invite-info/{token}")
+def get_invite_info(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """Public invite details for the landing page. The token itself is the secret."""
+    invite = db.query(OrgInvite).filter(
+        OrgInvite.token == token,
+        OrgInvite.status == "pending",
+    ).first()
+
+    if invite:
+        org = db.query(Organization).filter(Organization.id == invite.org_id).first()
+        inviter = db.query(User).filter(User.id == invite.inviter_id).first()
+        return {
+            "kind": "invite",
+            "org_name": org.name if org else "Unknown",
+            "inviter_name": inviter.name if inviter else None,
+            "role": invite.role,
+            "email": invite.invitee_email,  # None for shareable links
+        }
+
+    # Legacy links used the raw org slug
+    org = db.query(Organization).filter(Organization.slug == token).first()
+    if org:
+        return {"kind": "org_link", "org_name": org.name, "inviter_name": None, "role": "viewer", "email": None}
+
+    raise HTTPException(status_code=404, detail="This invitation link is invalid or has expired.")
+
+
+@router.post("/team/invite/{token}/accept")
+def accept_invite_by_token(
+    token: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Accept an invitation link (email invite or shareable link)."""
+    if current_user.org_id:
+        raise HTTPException(status_code=400, detail="You already belong to an organization.")
+
+    invite = db.query(OrgInvite).filter(
+        OrgInvite.token == token,
+        OrgInvite.status == "pending",
+    ).first()
+
+    if not invite:
+        # Legacy org-slug links keep working
+        org = db.query(Organization).filter(Organization.slug == token).first()
+        if not org:
+            raise HTTPException(status_code=404, detail="This invitation link is invalid or has expired.")
+        current_user.org_id = org.id
+        current_user.role = "viewer"
+        db.commit()
+        logger.info(f"User {current_user.email} joined org {org.id} via legacy slug link")
+        return {"status": "success", "message": f"You've joined {org.name} as viewer."}
+
+    if invite.invitee_email and invite.invitee_email != (current_user.email or "").lower():
+        raise HTTPException(
+            status_code=403,
+            detail=f"This invitation was sent to {invite.invitee_email}. Sign in with that email to accept it.",
+        )
+
+    current_user.org_id = invite.org_id
+    current_user.role = invite.role
+    if invite.invitee_email:
+        # Email invites are single-use; shareable links stay open
+        invite.invitee_id = current_user.id
+        invite.status = "accepted"
+    db.commit()
+
+    org = db.query(Organization).filter(Organization.id == invite.org_id).first()
+    logger.info(f"User {current_user.email} accepted invite token to org {invite.org_id} as {invite.role}")
+    return {
+        "status": "success",
+        "message": f"You've joined {org.name if org else 'the organization'} as {invite.role}.",
     }
 
 
@@ -246,8 +384,12 @@ def get_my_invites(
     current_user: User = Depends(get_current_user),
 ):
     """Get all pending invitations for the current user."""
+    # Match by id OR email so invites sent before signup auto-link to the new account
     invites = db.query(OrgInvite).filter(
-        OrgInvite.invitee_id == current_user.id,
+        or_(
+            OrgInvite.invitee_id == current_user.id,
+            OrgInvite.invitee_email == (current_user.email or "").lower(),
+        ),
         OrgInvite.status == "pending",
     ).all()
 
@@ -277,7 +419,10 @@ def accept_invite(
     """Accept an organization invitation."""
     invite = db.query(OrgInvite).filter(
         OrgInvite.id == invite_id,
-        OrgInvite.invitee_id == current_user.id,
+        or_(
+            OrgInvite.invitee_id == current_user.id,
+            OrgInvite.invitee_email == (current_user.email or "").lower(),
+        ),
         OrgInvite.status == "pending",
     ).first()
 
@@ -290,6 +435,7 @@ def accept_invite(
     # Join the organization
     current_user.org_id = invite.org_id
     current_user.role = invite.role
+    invite.invitee_id = current_user.id
     invite.status = "accepted"
     db.commit()
 
@@ -310,13 +456,17 @@ def decline_invite(
     """Decline an organization invitation."""
     invite = db.query(OrgInvite).filter(
         OrgInvite.id == invite_id,
-        OrgInvite.invitee_id == current_user.id,
+        or_(
+            OrgInvite.invitee_id == current_user.id,
+            OrgInvite.invitee_email == (current_user.email or "").lower(),
+        ),
         OrgInvite.status == "pending",
     ).first()
 
     if not invite:
         raise HTTPException(status_code=404, detail="Invitation not found or already handled.")
 
+    invite.invitee_id = current_user.id
     invite.status = "declined"
     db.commit()
 

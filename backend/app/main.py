@@ -80,6 +80,18 @@ async def lifespan(app: FastAPI):
                     conn.execute(text(f"ALTER TABLE query_history ADD COLUMN {col_name} {col_def}"))
                     print(f"Added '{col_name}' column to query_history table")
 
+        # -- org_invites table
+        if inspector.has_table("org_invites"):
+            invite_cols = [c["name"] for c in inspector.get_columns("org_invites")]
+            if "invitee_email" not in invite_cols:
+                conn.execute(text("ALTER TABLE org_invites ADD COLUMN invitee_email TEXT"))
+                print("Added 'invitee_email' column to org_invites table")
+            if "token" not in invite_cols:
+                conn.execute(text("ALTER TABLE org_invites ADD COLUMN token TEXT"))
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_org_invites_token ON org_invites (token)"))
+                print("Added 'token' column to org_invites table")
+            conn.execute(text("ALTER TABLE org_invites ALTER COLUMN invitee_id DROP NOT NULL"))
+
         conn.commit()
 
     yield

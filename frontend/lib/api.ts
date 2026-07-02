@@ -182,6 +182,21 @@ export const declineInvite = async (inviteId: number) => {
   return res.data;
 };
 
+export const createInviteLink = async (role: string = 'viewer') => {
+  const res = await api.post('/settings/team/invite-link', { role });
+  return res.data;
+};
+
+export const getInviteInfo = async (token: string) => {
+  const res = await api.get(`/settings/team/invite-info/${token}`);
+  return res.data;
+};
+
+export const acceptInviteByToken = async (token: string) => {
+  const res = await api.post(`/settings/team/invite/${token}/accept`);
+  return res.data;
+};
+
 export const getSnippets = async (connectionId?: number) => {
   const params: Record<string, unknown> = {};
   if (connectionId) params.connection_id = connectionId;

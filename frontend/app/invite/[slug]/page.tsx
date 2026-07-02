@@ -1,128 +1,252 @@
-"use client";
+'use client';
 
-import { use, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "@/lib/use-auth";
-import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database, Loader2, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
+import { use, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useSession } from '@/lib/use-auth';
+import { getInviteInfo, acceptInviteByToken } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Database, Loader2, CheckCircle2, AlertCircle, ArrowRight, Users, Shield, BarChart3 } from 'lucide-react';
 
-interface InvitePageProps {
-  params: Promise<{ slug: string }>;
+interface InviteInfo {
+  kind: 'invite' | 'org_link';
+  org_name: string;
+  inviter_name: string | null;
+  role: string;
+  email: string | null;
 }
 
-export default function InviteLandingPage({ params }: InvitePageProps) {
+const FEATURES = [
+  { Icon: Users,     text: 'Shared database connections and query history' },
+  { Icon: BarChart3, text: 'Ask questions in plain English, get charts back' },
+  { Icon: Shield,    text: 'Role-based access keeps your data safe' },
+];
+
+export default function InviteLandingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const router = useRouter();
   const { session, isLoading: authLoading } = useSession();
-  
+
+  const [info, setInfo] = useState<InviteInfo | null>(null);
+  const [infoError, setInfoError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joined, setJoined] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !session) {
-      router.push(`/sign-up?redirect=/invite/${slug}`);
-    }
-  }, [session, authLoading, slug, router]);
+    getInviteInfo(slug)
+      .then(setInfo)
+      .catch((err: { response?: { data?: { detail?: string } } }) => {
+        setInfoError(err.response?.data?.detail || 'This invitation link is invalid or has expired.');
+      });
+  }, [slug]);
 
-  const handleJoinWorkspace = async () => {
+  const handleJoin = async () => {
+    if (joining) return;
     setJoining(true);
-    setError(null);
+    setJoinError(null);
     try {
-      await api.post(`/settings/team/join-via-slug/${slug}`);
-      setSuccess(true);
-      
-      setTimeout(() => {
-        router.push("/");
-      }, 2000);
-    } catch (err: any) {
-      const detail = err.response?.data?.detail || "An unexpected error occurred while joining the workspace.";
-      setError(detail);
+      await acceptInviteByToken(slug);
+      setJoined(true);
+      setTimeout(() => router.push('/'), 1800);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setJoinError(e.response?.data?.detail || 'Something went wrong while joining. Please try again.');
     } finally {
       setJoining(false);
     }
   };
 
-  if (authLoading || (!session && !error)) {
-    return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-      </div>
-    );
-  }
+  const loading = authLoading || (!info && !infoError);
+  const roleLabel = info ? info.role.charAt(0).toUpperCase() + info.role.slice(1) : '';
+  const returnTo = encodeURIComponent(`/invite/${slug}`);
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-[#e5e1e4] flex items-center justify-center p-6 relative">
-      <div className="pointer-events-none absolute inset-x-0 top-[-160px] h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,0.04),transparent_64%)]" />
+    <div className="flex min-h-screen">
 
-      <Card className="max-w-md w-full border-white/[0.06] bg-[#111214] rounded-2xl overflow-hidden shadow-2xl relative z-10">
-        <CardHeader className="border-b border-white/[0.06] bg-[#0d0e10] py-6 px-6 text-center">
-          <div className="mx-auto h-12 w-12 rounded-xl bg-[#09090b] border border-white/[0.06] flex items-center justify-center mb-4">
-            <Database className="h-5 w-5 text-slate-300" />
+      {/* ── Left: brand panel ── */}
+      <div
+        className="hidden lg:flex lg:w-[460px] xl:w-[500px] flex-shrink-0 flex-col justify-between p-10"
+        style={{ background: 'var(--ds-accent)' }}
+      >
+        <Link href="/" className="flex items-center gap-2.5 w-fit">
+          <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center shadow-sm">
+            <Database className="h-4 w-4" style={{ color: 'var(--ds-accent)' }} />
           </div>
-          <CardTitle className="text-lg font-bold tracking-tight text-[#e5e1e4]">Workspace Invitation</CardTitle>
-          <CardDescription className="text-sm text-slate-400 mt-1.5">
-            You have been invited to collaborate on organization{" "}
-            <span className="text-white font-semibold font-mono text-xs bg-[#09090b] px-1.5 py-0.5 rounded border border-white/[0.04]">
-              {slug}
-            </span>
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent className="p-6 space-y-5 text-sm">
-          {error && (
-            <div className="flex items-start gap-2.5 p-4 rounded-xl border text-[#ffb4ab] bg-[#09090b] border-[#ffb4ab]/20">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <p className="leading-relaxed font-medium text-sm">{error}</p>
-            </div>
-          )}
+          <span className="text-[15px] font-bold text-white tracking-tight">Intelliquery</span>
+        </Link>
 
-          {success ? (
-            <div className="flex flex-col items-center justify-center text-center py-6 space-y-3">
-              <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                <CheckCircle2 className="h-5 w-5" />
+        <div className="space-y-8">
+          <div>
+            <h2 className="text-[34px] font-bold text-white leading-[1.2] tracking-tight">
+              Better together
+            </h2>
+            <p className="mt-4 text-[15px] text-white/70 leading-relaxed">
+              Join your team and start exploring your data — no SQL required.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {FEATURES.map(({ Icon, text }) => (
+              <div key={text} className="flex items-center gap-3">
+                <div className="h-7 w-7 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0 border border-white/20">
+                  <Icon className="h-3.5 w-3.5 text-white" />
+                </div>
+                <span className="text-[13px] text-white/80 leading-snug">{text}</span>
               </div>
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-slate-200">Invitation Accepted</p>
-                <p className="text-xs text-slate-500">Syncing workspace environment pools now...</p>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-[12px] text-white/30">© {new Date().getFullYear()} Intelliquery · All rights reserved</p>
+      </div>
+
+      {/* ── Right: content panel ── */}
+      <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-base-0 px-6 py-12">
+
+        {/* Mobile logo */}
+        <Link href="/" className="flex items-center gap-2 mb-10 lg:hidden">
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--ds-accent)' }}>
+            <Database className="h-4 w-4 text-white" />
+          </div>
+          <span className="text-[15px] font-bold text-content-1">Intelliquery</span>
+        </Link>
+
+        <div className="w-full max-w-[400px]">
+          {loading ? (
+            <div className="flex items-center gap-2 text-content-3 justify-center py-20">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-[13px]">Loading invitation…</span>
+            </div>
+
+          ) : infoError ? (
+            /* ── Invalid / expired link ── */
+            <div className="w-full space-y-6">
+              <div className="flex flex-col items-center text-center gap-4 py-4">
+                <div
+                  className="h-14 w-14 rounded-full flex items-center justify-center"
+                  style={{ background: 'var(--ds-error-muted)', border: '2px solid var(--ds-error-border)' }}
+                >
+                  <AlertCircle className="h-7 w-7 text-error" />
+                </div>
+                <div className="space-y-1.5">
+                  <h2 className="text-[22px] font-bold tracking-tight text-content-1">Invitation not found</h2>
+                  <p className="text-[14px] text-content-3 max-w-[320px] leading-relaxed">{infoError}</p>
+                  <p className="text-[13px] text-content-3">Ask your teammate to send you a new one.</p>
+                </div>
+              </div>
+              <p className="text-center text-[13px] text-content-3">
+                <Link href="/" className="font-semibold text-content-1 hover:text-brand transition-colors">
+                  Back to Intelliquery
+                </Link>
+              </p>
+            </div>
+
+          ) : joined ? (
+            /* ── Success ── */
+            <div className="w-full space-y-6">
+              <div className="flex flex-col items-center text-center gap-4 py-4">
+                <div
+                  className="h-14 w-14 rounded-full flex items-center justify-center"
+                  style={{ background: 'var(--ds-success-muted)', border: '2px solid var(--ds-success-border)' }}
+                >
+                  <CheckCircle2 className="h-7 w-7 text-success" />
+                </div>
+                <div className="space-y-1.5">
+                  <h2 className="text-[22px] font-bold tracking-tight text-content-1">You&apos;re in!</h2>
+                  <p className="text-[14px] text-content-3 max-w-[320px] leading-relaxed">
+                    You&apos;ve joined <span className="font-medium text-content-2">{info?.org_name}</span> as {info?.role}.
+                    Taking you to your workspace…
+                  </p>
+                </div>
               </div>
             </div>
+
           ) : (
-            <div className="space-y-5 pt-1">
-              <p className="text-slate-400 text-center text-sm leading-relaxed">
-                Accepting this invitation will securely link your user profile to this workspace container. You will be granted instant access to shared metrics datasets, dynamic dashboards, and team query histories.
-              </p>
-              
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <Button 
-                  variant="ghost" 
-                  className="h-10 text-sm font-semibold rounded-xl border border-white/[0.06] bg-[#0d0e10] text-slate-300 hover:text-white transition-colors"
-                  onClick={() => router.push("/")}
-                  disabled={joining}
+            /* ── Invitation details ── */
+            <div className="w-full space-y-6">
+              <div className="flex flex-col items-center text-center gap-4 py-4">
+                <div
+                  className="h-14 w-14 rounded-full flex items-center justify-center"
+                  style={{ background: 'var(--ds-base-2)', border: '2px solid var(--ds-border-subtle)' }}
                 >
-                  Cancel
-                </Button>
-                <Button 
-                  className="h-10 text-sm bg-white hover:bg-slate-200 text-zinc-950 font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                  onClick={handleJoinWorkspace}
-                  disabled={joining}
-                >
-                  {joining ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      Join Team 
-                      <ArrowRight className="h-4 w-4" />
-                    </>
-                  )}
-                </Button>
+                  <Users className="h-7 w-7 text-content-2" />
+                </div>
+                <div className="space-y-1.5">
+                  <h2 className="text-[22px] font-bold tracking-tight text-content-1">
+                    Join {info?.org_name}
+                  </h2>
+                  <p className="text-[14px] text-content-3 max-w-[320px] leading-relaxed">
+                    {info?.inviter_name ? (
+                      <><span className="font-medium text-content-2">{info.inviter_name}</span> invited you to their team on Intelliquery.</>
+                    ) : (
+                      <>You&apos;ve been invited to a team on Intelliquery.</>
+                    )}
+                  </p>
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold mt-1"
+                    style={{ background: 'var(--ds-base-2)', color: 'var(--ds-text-2)', border: '1px solid var(--ds-border-subtle)' }}
+                  >
+                    <Shield className="h-3 w-3" /> You&apos;ll join as {roleLabel}
+                  </span>
+                </div>
               </div>
+
+              {joinError && (
+                <div
+                  className="flex items-start gap-2.5 rounded-lg p-3 text-[13px]"
+                  style={{
+                    background: 'var(--ds-error-muted)',
+                    border: '1px solid var(--ds-error-border)',
+                    color: 'var(--ds-error)',
+                  }}
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{joinError}</span>
+                </div>
+              )}
+
+              {session ? (
+                <div className="space-y-3">
+                  <Button onClick={handleJoin} disabled={joining} className="w-full h-11 gap-2 font-semibold text-[14px]">
+                    {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                    {joining ? 'Joining…' : `Join ${info?.org_name}`}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => router.push('/')}
+                    disabled={joining}
+                    className="w-full h-11 text-[14px] text-content-3"
+                  >
+                    Not now
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Link href={`/sign-up?redirect=${returnTo}`} className="block">
+                    <Button className="w-full h-11 gap-2 font-semibold text-[14px]">
+                      Create an account to join
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <p className="text-center text-[13px] text-content-3">
+                    Already have an account?{' '}
+                    <Link href={`/sign-in?redirect=${returnTo}`} className="font-semibold text-content-1 hover:text-brand transition-colors">
+                      Sign in
+                    </Link>
+                  </p>
+                  {info?.email && (
+                    <p className="text-center text-[12px] text-content-3">
+                      This invitation was sent to <span className="font-medium">{info.email}</span> — use that email.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
     </div>
   );
 }

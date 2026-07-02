@@ -136,7 +136,11 @@ class OrgInvite(Base):
     id = Column(Integer, primary_key=True, index=True)
     org_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     inviter_id = Column(Text, ForeignKey("user.id"), nullable=False)
-    invitee_id = Column(Text, ForeignKey("user.id"), nullable=False)
+    # Nullable: email invites can target people who haven't signed up yet.
+    invitee_id = Column(Text, ForeignKey("user.id"), nullable=True)
+    # Set for email invites (single-use); NULL for shareable link invites (reusable).
+    invitee_email = Column(Text, nullable=True, index=True)
+    token = Column(Text, unique=True, index=True, nullable=True)
     role = Column(Text, default="viewer")
     status = Column(Text, default="pending")  # pending, accepted, declined
     created_at = Column(DateTime, default=datetime.utcnow)
