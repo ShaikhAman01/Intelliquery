@@ -405,7 +405,7 @@ export function LandingPage() {
               <Database className="h-3 w-3 text-white" />
             </div>
             <span className="font-semibold text-content-2">Intelliquery</span>
-            <span className="text-content-3">· © 2025 All rights reserved</span>
+            <span className="text-content-3">· © {new Date().getFullYear()} All rights reserved</span>
           </div>
           <div className="flex items-center gap-5">
             <Link href="/privacy" className="hover:text-content-1 transition-colors">Privacy</Link>

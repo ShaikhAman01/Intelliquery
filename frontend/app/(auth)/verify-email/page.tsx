@@ -47,7 +47,7 @@ export default function VerifyEmailPage() {
           </div>
         </div>
 
-        <p className="text-[12px] text-white/30">© 2025 Intelliquery · All rights reserved</p>
+        <p className="text-[12px] text-white/30">© {new Date().getFullYear()} Intelliquery · All rights reserved</p>
       </div>
 
       {/* ── Right: content panel ── */}

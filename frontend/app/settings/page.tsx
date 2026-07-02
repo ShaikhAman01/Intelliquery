@@ -15,6 +15,7 @@ import {
 import {
   User, Building2, Users, Shield, Mail, Copy, Check,
   Loader2, AlertCircle, ArrowLeft, Pencil, LogOut, Eye, EyeOff,
+  Monitor, Smartphone, Trash2,
 } from 'lucide-react';
 import { useState, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
@@ -309,6 +310,42 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
     );
   };
 
+  /* Change email */
+  const [changingEmail, setChangingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const handleChangeEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const target = newEmail.trim();
+    if (!target || emailSaving) return;
+    if (target.toLowerCase() === (user?.email || '').toLowerCase()) {
+      setEmailMsg({ text: 'That is already your email address.', type: 'error' });
+      return;
+    }
+    setEmailSaving(true);
+    setEmailMsg(null);
+    const { error } = await (authClient as any).changeEmail({
+      newEmail: target,
+      callbackURL: '/settings',
+    });
+    setEmailSaving(false);
+    if (error) {
+      setEmailMsg({ text: error.message || 'Could not change email. Please try again.', type: 'error' });
+    } else {
+      setChangingEmail(false);
+      setNewEmail('');
+      if (isVerified) {
+        // Approval link goes to the current address; nothing changes until it's clicked.
+        setEmailMsg({ text: `Approval link sent to ${user?.email}. The change takes effect once you approve it.`, type: 'success' });
+      } else {
+        setEmailMsg({ text: `Email updated to ${target}.`, type: 'success' });
+        setTimeout(() => window.location.reload(), 1200);
+      }
+    }
+  };
+
   const initial = (user?.name?.[0] || user?.email?.[0] || 'U').toUpperCase();
   const shortId = user?.id ? user.id.replace(/-/g, '').slice(-8).toUpperCase() : '—';
   const roleLabel = user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : null;
@@ -413,16 +450,27 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
               label: 'Email address',
               value: user?.email || '—',
               note: 'Used for sign-in and account notifications.',
-              suffix: isVerified ? (
-                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                  style={{ background: 'var(--ds-success-muted)', color: 'var(--ds-success)', border: '1px solid var(--ds-success-border)' }}>
-                  <Check className="h-3 w-3" /> Verified
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                  style={{ background: 'var(--ds-warning-muted)', color: 'var(--ds-warning)', border: '1px solid var(--ds-warning-border)' }}>
-                  <AlertCircle className="h-3 w-3" /> Unverified
-                </span>
+              suffix: (
+                <div className="flex items-center gap-2.5">
+                  {isVerified ? (
+                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                      style={{ background: 'var(--ds-success-muted)', color: 'var(--ds-success)', border: '1px solid var(--ds-success-border)' }}>
+                      <Check className="h-3 w-3" /> Verified
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                      style={{ background: 'var(--ds-warning-muted)', color: 'var(--ds-warning)', border: '1px solid var(--ds-warning-border)' }}>
+                      <AlertCircle className="h-3 w-3" /> Unverified
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setChangingEmail(v => !v); setEmailMsg(null); }}
+                    className="text-[12px] font-medium text-content-3 hover:text-content-1 underline-offset-2 hover:underline transition-colors"
+                  >
+                    {changingEmail ? 'Cancel' : 'Change'}
+                  </button>
+                </div>
               ),
             },
             ...(roleLabel ? [{
@@ -460,6 +508,51 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
           ))}
         </div>
 
+        {/* Change email — inline form */}
+        {changingEmail && (
+          <form
+            onSubmit={handleChangeEmail}
+            className="mt-4 space-y-3 rounded-lg px-3.5 py-3"
+            style={{ background: 'var(--ds-base-2)', border: '1px solid var(--ds-border-subtle)' }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="new-email" className="text-[13px] font-medium text-content-2">New email address</Label>
+              <Input
+                id="new-email"
+                type="email"
+                placeholder="you@company.com"
+                value={newEmail}
+                onChange={e => setNewEmail(e.target.value)}
+                required
+                autoFocus
+                className="h-9 text-[13px]"
+              />
+            </div>
+            <p className="text-[11px] text-content-3">
+              {isVerified
+                ? `We'll send an approval link to ${user?.email} — nothing changes until you click it.`
+                : 'Your email will be updated right away.'}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button type="submit" size="sm" disabled={emailSaving || !newEmail.trim()} className="h-8 gap-1.5 text-[12px]">
+                {emailSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Update email
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => { setChangingEmail(false); setNewEmail(''); setEmailMsg(null); }}
+                disabled={emailSaving}
+                className="h-8 text-[12px]"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        )}
+        {emailMsg && <div className="mt-3"><StatusMessage message={emailMsg.text} type={emailMsg.type} /></div>}
+
         {/* Unverified email — nudge with one-click resend */}
         {!isVerified && (
           <div
@@ -486,28 +579,257 @@ function ProfileTab({ user }: { user: { id?: string; name?: string | null; email
 
       <ChangePasswordSection />
 
-      {/* Sign out */}
-      <Section title="Session" description="Manage your active session">
-        <div className="flex items-center justify-between">
+      <SessionsSection email={user?.email} />
+
+      <DeleteAccountSection email={user?.email} />
+    </div>
+  );
+}
+
+/* ── Active sessions ─────────────────────────────────────── */
+
+interface DeviceSession {
+  id: string;
+  token: string;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  createdAt: string | Date;
+}
+
+function describeDevice(ua?: string | null): { label: string; mobile: boolean } {
+  if (!ua) return { label: 'Unknown device', mobile: false };
+  const mobile = /Mobi|Android|iPhone|iPad/i.test(ua);
+  const browser =
+    /Edg\//.test(ua) ? 'Edge' :
+    /OPR\//.test(ua) ? 'Opera' :
+    /Chrome\//.test(ua) ? 'Chrome' :
+    /Firefox\//.test(ua) ? 'Firefox' :
+    /Safari\//.test(ua) ? 'Safari' : 'Browser';
+  const os =
+    /Android/.test(ua) ? 'Android' :
+    /iPhone|iPad/.test(ua) ? 'iOS' :
+    /Windows/.test(ua) ? 'Windows' :
+    /Mac OS X/.test(ua) ? 'macOS' :
+    /Linux/.test(ua) ? 'Linux' : 'unknown OS';
+  return { label: `${browser} on ${os}`, mobile };
+}
+
+function SessionsSection({ email }: { email?: string | null }) {
+  const [sessions, setSessions] = useState<DeviceSession[] | null>(null);
+  const [currentToken, setCurrentToken] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null); // session token, or '__others__'
+  const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [listRes, currentRes] = await Promise.all([
+        (authClient as any).listSessions(),
+        authClient.getSession(),
+      ]);
+      const token: string | null = (currentRes?.data as any)?.session?.token ?? null;
+      const list: DeviceSession[] = [...(listRes?.data ?? [])];
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      if (token) list.sort((a, b) => Number(b.token === token) - Number(a.token === token));
+      setCurrentToken(token);
+      setSessions(list);
+    } catch {
+      setSessions([]);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const revoke = async (token: string) => {
+    if (busy) return;
+    setBusy(token);
+    setMsg(null);
+    const { error } = await (authClient as any).revokeSession({ token });
+    setBusy(null);
+    if (error) {
+      setMsg({ text: error.message || 'Could not sign out that device.', type: 'error' });
+    } else {
+      setMsg({ text: 'Device signed out.', type: 'success' });
+      load();
+    }
+  };
+
+  const revokeOthers = async () => {
+    if (busy) return;
+    setBusy('__others__');
+    setMsg(null);
+    const { error } = await (authClient as any).revokeOtherSessions();
+    setBusy(null);
+    if (error) {
+      setMsg({ text: error.message || 'Could not sign out other devices.', type: 'error' });
+    } else {
+      setMsg({ text: 'All other devices signed out.', type: 'success' });
+      load();
+    }
+  };
+
+  const others = (sessions ?? []).filter(s => s.token !== currentToken);
+
+  return (
+    <Section title="Active sessions" description="Devices currently signed in to your account">
+      {sessions === null ? (
+        <div className="flex items-center gap-2 py-4 text-content-3">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-[13px]">Loading sessions…</span>
+        </div>
+      ) : (
+        <div className="divide-y divide-border">
+          {sessions.map(s => {
+            const { label, mobile } = describeDevice(s.userAgent);
+            const isCurrent = s.token === currentToken;
+            const DeviceIcon = mobile ? Smartphone : Monitor;
+            return (
+              <div key={s.id} className="flex items-center justify-between gap-4 py-3.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-base-2 border border-border">
+                    <DeviceIcon className="h-4 w-4 text-content-2" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-medium text-content-1 truncate">{label}</p>
+                    <p className="text-[12px] text-content-3 mt-0.5 truncate">
+                      {[s.ipAddress, `Signed in ${new Date(s.createdAt).toLocaleDateString()}`].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                </div>
+                {isCurrent ? (
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold flex-shrink-0"
+                    style={{ background: 'var(--ds-success-muted)', color: 'var(--ds-success)', border: '1px solid var(--ds-success-border)' }}>
+                    <Check className="h-3 w-3" /> This device
+                  </span>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => revoke(s.token)}
+                    disabled={!!busy}
+                    className="h-8 text-[12px] flex-shrink-0 text-content-3 hover:text-content-1"
+                  >
+                    {busy === s.token ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Sign out'}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {msg && <div className="mt-3"><StatusMessage message={msg.text} type={msg.type} /></div>}
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+        {others.length > 0 ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={revokeOthers}
+            disabled={!!busy}
+            className="h-8 gap-1.5 text-[12px]"
+          >
+            {busy === '__others__' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Sign out all other devices
+          </Button>
+        ) : (
+          <p className="text-[12px] text-content-3">Signed in as <span className="font-medium">{email}</span></p>
+        )}
+        <Button
+          variant="ghost"
+          className="gap-2 text-[13px] border flex-shrink-0"
+          style={{ color: 'var(--ds-error)', borderColor: 'var(--ds-error-border)' }}
+          onClick={async () => {
+            await authClient.signOut();
+            localStorage.removeItem('iq-connection');
+            window.location.href = '/sign-in';
+          }}
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </Button>
+      </div>
+    </Section>
+  );
+}
+
+/* ── Delete account ──────────────────────────────────────── */
+
+function DeleteAccountSection({ email }: { email?: string | null }) {
+  const [confirming, setConfirming] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [pending, setPending] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const match = confirmText.trim().toLowerCase() === (email || '').toLowerCase();
+
+  const handleDelete = async () => {
+    if (!match || pending) return;
+    setPending(true);
+    setMsg(null);
+    const { error } = await (authClient as any).deleteUser({ callbackURL: '/sign-in' });
+    setPending(false);
+    if (error) {
+      setMsg({ text: error.message || 'Could not start account deletion. Please try again.', type: 'error' });
+    } else {
+      setConfirming(false);
+      setConfirmText('');
+      setMsg({ text: `Confirmation email sent to ${email}. Your account will be deleted once you confirm it there.`, type: 'success' });
+    }
+  };
+
+  return (
+    <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--ds-error-border)' }}>
+      <div className="px-6 py-4 border-b" style={{ background: 'var(--ds-error-muted)', borderColor: 'var(--ds-error-border)' }}>
+        <h3 className="text-[15px] font-semibold" style={{ color: 'var(--ds-error)' }}>Danger zone</h3>
+        <p className="mt-0.5 text-[13px] text-content-3">Irreversible actions — proceed with caution</p>
+      </div>
+      <div className="p-6 space-y-4" style={{ background: 'var(--ds-base-0)' }}>
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-[13px] text-content-2">Signed in as <span className="font-medium">{user?.email}</span></p>
-            <p className="text-[12px] text-content-3 mt-0.5">You will be redirected to the sign-in page.</p>
+            <p className="text-[14px] font-medium text-content-1">Delete account</p>
+            <p className="text-[13px] text-content-3 mt-0.5">
+              Permanently removes your account, saved queries, and connections. This cannot be undone.
+            </p>
           </div>
           <Button
             variant="ghost"
-            className="gap-2 text-[13px] border flex-shrink-0"
-            style={{ color: 'var(--ds-error)', borderColor: 'var(--ds-error-border)' }}
-            onClick={async () => {
-              await authClient.signOut();
-              localStorage.removeItem('iq-connection');
-              window.location.href = '/sign-in';
-            }}
+            className="flex-shrink-0 gap-2 text-[13px] font-medium border"
+            style={{ color: 'var(--ds-error)', borderColor: 'var(--ds-error-border)', background: 'transparent' }}
+            onClick={() => { setConfirming(v => !v); setConfirmText(''); setMsg(null); }}
           >
-            <LogOut className="h-4 w-4" />
-            Sign out
+            <Trash2 className="h-4 w-4" />
+            {confirming ? 'Cancel' : 'Delete account'}
           </Button>
         </div>
-      </Section>
+
+        {confirming && (
+          <div className="space-y-3 rounded-lg px-3.5 py-3" style={{ background: 'var(--ds-error-muted)', border: '1px solid var(--ds-error-border)' }}>
+            <p className="text-[13px] text-content-2">
+              Type <span className="font-semibold">{email}</span> to confirm. We&apos;ll email you a final confirmation link before anything is deleted.
+            </p>
+            <Input
+              type="email"
+              placeholder={email || ''}
+              value={confirmText}
+              onChange={e => setConfirmText(e.target.value)}
+              autoFocus
+              className="h-9 text-[13px]"
+            />
+            <Button
+              size="sm"
+              onClick={handleDelete}
+              disabled={!match || pending}
+              className="h-8 gap-1.5 text-[12px]"
+              style={{ background: 'var(--ds-error)', color: 'white' }}
+            >
+              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Send deletion confirmation
+            </Button>
+          </div>
+        )}
+
+        {msg && <StatusMessage message={msg.text} type={msg.type} />}
+      </div>
     </div>
   );
 }

@@ -49,7 +49,7 @@ export function InfoPage({
 
       <footer className="border-t border-border py-6" style={{ background: 'var(--ds-base-1)' }}>
         <p className="text-center text-[12px] text-content-3">
-          Intelliquery · © 2025 All rights reserved ·{' '}
+          Intelliquery · © {new Date().getFullYear()} All rights reserved ·{' '}
           <Link href="/terms" className="hover:text-content-1 transition-colors underline">Terms</Link> ·{' '}
           <Link href="/privacy" className="hover:text-content-1 transition-colors underline">Privacy</Link> ·{' '}
           <Link href="/docs" className="hover:text-content-1 transition-colors underline">Docs</Link>

@@ -54,7 +54,7 @@ export function verifyEmail(name: string, url: string): string {
         <a href="${url}" style="color:#2563eb;word-break:break-all;font-size:12px">${url}</a>
       </p>
       <hr style="border:none;border-top:1px solid #eee;margin:32px 0 16px">
-      <p style="font-size:12px;color:#bbb;margin:0">Intelliquery · © 2025 All rights reserved</p>
+      <p style="font-size:12px;color:#bbb;margin:0">Intelliquery · © ${new Date().getFullYear()} All rights reserved</p>
     </div>
   `;
 }
@@ -82,7 +82,65 @@ export function resetPasswordEmail(name: string, url: string): string {
         <a href="${url}" style="color:#2563eb;word-break:break-all;font-size:12px">${url}</a>
       </p>
       <hr style="border:none;border-top:1px solid #eee;margin:32px 0 16px">
-      <p style="font-size:12px;color:#bbb;margin:0">Intelliquery · © 2025 All rights reserved</p>
+      <p style="font-size:12px;color:#bbb;margin:0">Intelliquery · © ${new Date().getFullYear()} All rights reserved</p>
+    </div>
+  `;
+}
+
+export function changeEmailApproval(name: string, newEmail: string, url: string): string {
+  return `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:40px 20px;color:#111">
+      <div style="margin-bottom:28px;display:flex;align-items:center;gap:10px">
+        <div style="background:#2563eb;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center">
+          <span style="color:white;font-size:13px;font-weight:700">IQ</span>
+        </div>
+        <span style="font-size:15px;font-weight:700;color:#111">Intelliquery</span>
+      </div>
+      <h2 style="font-size:22px;font-weight:700;margin:0 0 12px">Approve email change</h2>
+      <p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 28px">
+        Hi ${name || "there"},<br><br>
+        You asked to change your Intelliquery email to <strong>${newEmail}</strong>.
+        Click the button below to approve the change.
+      </p>
+      <a href="${url}" style="display:inline-block;background:#2563eb;color:white;text-decoration:none;padding:13px 30px;border-radius:10px;font-size:15px;font-weight:600;margin-bottom:32px">
+        Approve change →
+      </a>
+      <p style="font-size:13px;color:#888;line-height:1.6">
+        If you didn't request this, ignore this email and consider changing your password — someone may have access to your account.<br><br>
+        Or paste this link in your browser:<br>
+        <a href="${url}" style="color:#2563eb;word-break:break-all;font-size:12px">${url}</a>
+      </p>
+      <hr style="border:none;border-top:1px solid #eee;margin:32px 0 16px">
+      <p style="font-size:12px;color:#bbb;margin:0">Intelliquery · © ${new Date().getFullYear()} All rights reserved</p>
+    </div>
+  `;
+}
+
+export function deleteAccountEmail(name: string, url: string): string {
+  return `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:40px 20px;color:#111">
+      <div style="margin-bottom:28px;display:flex;align-items:center;gap:10px">
+        <div style="background:#2563eb;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center">
+          <span style="color:white;font-size:13px;font-weight:700">IQ</span>
+        </div>
+        <span style="font-size:15px;font-weight:700;color:#111">Intelliquery</span>
+      </div>
+      <h2 style="font-size:22px;font-weight:700;margin:0 0 12px">Confirm account deletion</h2>
+      <p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 28px">
+        Hi ${name || "there"},<br><br>
+        You asked to permanently delete your Intelliquery account. This removes your
+        profile, saved queries, and connections, and <strong>cannot be undone</strong>.
+      </p>
+      <a href="${url}" style="display:inline-block;background:#dc2626;color:white;text-decoration:none;padding:13px 30px;border-radius:10px;font-size:15px;font-weight:600;margin-bottom:32px">
+        Delete my account
+      </a>
+      <p style="font-size:13px;color:#888;line-height:1.6">
+        If you didn't request this, ignore this email — your account is safe. Consider changing your password if you don't recognise this activity.<br><br>
+        Or paste this link in your browser:<br>
+        <a href="${url}" style="color:#2563eb;word-break:break-all;font-size:12px">${url}</a>
+      </p>
+      <hr style="border:none;border-top:1px solid #eee;margin:32px 0 16px">
+      <p style="font-size:12px;color:#bbb;margin:0">Intelliquery · © ${new Date().getFullYear()} All rights reserved</p>
     </div>
   `;
 }

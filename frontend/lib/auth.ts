@@ -1,7 +1,13 @@
 import { betterAuth } from "better-auth";
 // @ts-ignore
 import { Pool } from "pg";
-import { sendEmail, resetPasswordEmail, verifyEmail } from "./email";
+import {
+  sendEmail,
+  resetPasswordEmail,
+  verifyEmail,
+  changeEmailApproval,
+  deleteAccountEmail,
+} from "./email";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -31,6 +37,31 @@ export const auth = betterAuth({
         subject: "Verify your Intelliquery email",
         html: verifyEmail(user.name, url),
       });
+    },
+  },
+  user: {
+    changeEmail: {
+      enabled: true,
+      // Approval goes to the CURRENT address so a hijacked session can't
+      // silently swap the account email.
+      sendChangeEmailVerification: async ({ user, newEmail, url }) => {
+        await sendEmail({
+          to: user.email,
+          subject: "Approve your Intelliquery email change",
+          html: changeEmailApproval(user.name, newEmail, url),
+        });
+      },
+    },
+    deleteUser: {
+      enabled: true,
+      // Email confirmation works for both password and Google accounts.
+      sendDeleteAccountVerification: async ({ user, url }) => {
+        await sendEmail({
+          to: user.email,
+          subject: "Confirm deleting your Intelliquery account",
+          html: deleteAccountEmail(user.name, url),
+        });
+      },
     },
   },
   socialProviders: {
