@@ -12,7 +12,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from app.api.deps import get_db
-from app.models.core import User, Organization, OrgInvite
+from app.models.core import User, Organization, OrgInvite, DbConnection, QueryHistory, SavedSnippet
 from app.middleware.auth import get_current_user, require_viewer, require_admin, require_owner
 from app.core.config import settings
 from app.core.emailer import send_email, team_invite_email
@@ -50,6 +50,9 @@ class InviteLink(BaseModel):
 
 
 VALID_ROLES = ["viewer", "editor", "admin"]
+
+# Lifetime rename allowance per organization (enforced server-side)
+MAX_ORG_RENAMES = 1
 
 
 # ── Profile ──────────────────────────────────────────────────────────────────
@@ -146,6 +149,8 @@ def get_organization(
             "name": org.name,
             "slug": org.slug,
             "member_count": member_count,
+            "renames_used": org.rename_count or 0,
+            "max_renames": MAX_ORG_RENAMES,
         }
     }
 
@@ -164,12 +169,69 @@ def update_organization(
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found.")
 
+    if (org.rename_count or 0) >= MAX_ORG_RENAMES:
+        raise HTTPException(
+            status_code=403,
+            detail="Rename limit reached. Contact support to change your organization name.",
+        )
+
+    new_slug = data.name.lower().replace(" ", "-")
+    taken = db.query(Organization).filter(
+        Organization.slug == new_slug,
+        Organization.id != org.id,
+    ).first()
+    if taken:
+        raise HTTPException(status_code=400, detail=f"The name '{data.name}' is already taken.")
+
     org.name = data.name
-    org.slug = data.name.lower().replace(" ", "-")
+    org.slug = new_slug
+    org.rename_count = (org.rename_count or 0) + 1
     db.commit()
 
     logger.info(f"Organization renamed to '{data.name}' by {current_user.email}")
-    return {"status": "success", "name": org.name, "slug": org.slug}
+    return {
+        "status": "success",
+        "name": org.name,
+        "slug": org.slug,
+        "renames_used": org.rename_count,
+        "max_renames": MAX_ORG_RENAMES,
+    }
+
+
+@router.delete("/organization")
+def delete_organization(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_owner),
+):
+    """Permanently delete the organization and everything scoped to it. Requires owner role."""
+    if not current_user.org_id:
+        raise HTTPException(status_code=400, detail="You don't belong to an organization.")
+
+    org = db.query(Organization).filter(Organization.id == current_user.org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found.")
+
+    org_id, org_name = org.id, org.name
+    conn_ids = [c.id for c in db.query(DbConnection).filter(DbConnection.org_id == org_id).all()]
+
+    # Order matters: history and snippets reference connections
+    if conn_ids:
+        db.query(QueryHistory).filter(QueryHistory.connection_id.in_(conn_ids)).delete(synchronize_session=False)
+        db.query(SavedSnippet).filter(SavedSnippet.connection_id.in_(conn_ids)).delete(synchronize_session=False)
+        db.query(DbConnection).filter(DbConnection.id.in_(conn_ids)).delete(synchronize_session=False)
+
+    db.query(OrgInvite).filter(OrgInvite.org_id == org_id).delete(synchronize_session=False)
+
+    # Release members back to personal workspaces
+    db.query(User).filter(User.org_id == org_id).update(
+        {User.org_id: None, User.role: "owner"}, synchronize_session=False
+    )
+
+    db.delete(org)
+    db.commit()
+
+    logger.info(f"Organization {org_id} ('{org_name}') deleted by {current_user.email}")
+    return {"status": "success", "message": f"Organization '{org_name}' has been deleted."}
 
 
 # ── Team ─────────────────────────────────────────────────────────────────────
@@ -505,32 +567,3 @@ def update_member_role(
     logger.info(f"Role updated: {target.email} -> {data.role} by {current_user.email}")
     return {"status": "success", "message": f"Role updated to {data.role}."}
 
-@router.post("/team/join-via-slug/{slug}")
-def join_via_slug(
-    slug: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Allow an authenticated user without an organization to join via a public link."""
-    if current_user.org_id:
-        raise HTTPException(
-            status_code=400, 
-            detail="You already belong to an organization."
-        )
-
-    org = db.query(Organization).filter(Organization.slug == slug).first()
-    if not org:
-        raise HTTPException(
-            status_code=404, 
-            detail="The invitation link is invalid or has expired."
-        )
-
-    current_user.org_id = org.id
-    current_user.role = "viewer"
-    db.commit()
-
-    logger.info(f"User {current_user.email} joined org {org.name} via public slug link.")
-    return {
-        "status": "success",
-        "message": f"You have successfully joined {org.name} as a viewer."
-    }

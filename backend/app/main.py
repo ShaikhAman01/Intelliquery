@@ -80,6 +80,13 @@ async def lifespan(app: FastAPI):
                     conn.execute(text(f"ALTER TABLE query_history ADD COLUMN {col_name} {col_def}"))
                     print(f"Added '{col_name}' column to query_history table")
 
+        # -- organizations table
+        if inspector.has_table("organizations"):
+            org_cols = [c["name"] for c in inspector.get_columns("organizations")]
+            if "rename_count" not in org_cols:
+                conn.execute(text("ALTER TABLE organizations ADD COLUMN rename_count INTEGER DEFAULT 0 NOT NULL"))
+                print("Added 'rename_count' column to organizations table")
+
         # -- org_invites table
         if inspector.has_table("org_invites"):
             invite_cols = [c["name"] for c in inspector.get_columns("org_invites")]

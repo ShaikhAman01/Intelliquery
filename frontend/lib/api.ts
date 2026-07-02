@@ -152,6 +152,11 @@ export const updateOrganization = async (name: string) => {
   return res.data;
 };
 
+export const deleteOrganization = async () => {
+  const res = await api.delete('/settings/organization');
+  return res.data;
+};
+
 export const getTeamMembers = async () => {
   const res = await api.get('/settings/team');
   return res.data;

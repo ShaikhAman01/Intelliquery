@@ -28,6 +28,7 @@ import {
   getTeamMembers,
   inviteTeamMember,
   createInviteLink,
+  deleteOrganization,
 } from '@/lib/api';
 
 export default function SettingsPage() {
@@ -837,18 +838,6 @@ function DeleteAccountSection({ email }: { email?: string | null }) {
 
 /* ── Organization tab ────────────────────────────────────── */
 
-/* ── Org rename helpers — lifetime limit ── */
-const RENAME_KEY = 'iq_org_rename_count';
-const MAX_RENAMES = 1;
-
-function getRenameCount(): number {
-  try { return parseInt(localStorage.getItem(RENAME_KEY) ?? '0', 10) || 0; }
-  catch { return 0; }
-}
-function recordRename() {
-  try { localStorage.setItem(RENAME_KEY, String(getRenameCount() + 1)); } catch {}
-}
-
 function validateOrgName(name: string): string | null {
   const t = name.trim();
   if (!t) return 'Name is required.';
@@ -867,12 +856,13 @@ function OrgTab({ existingOrg, setExistingOrg }: {
   const [orgName, setOrgName] = useState((existingOrg?.name as string) || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [renamesUsed, setRenamesUsed] = useState(0);
 
   useEffect(() => { setOrgName((existingOrg?.name as string) || ''); }, [existingOrg]);
-  useEffect(() => { if (existingOrg) setRenamesUsed(getRenameCount()); }, [existingOrg]);
 
-  const renamesLeft = MAX_RENAMES - renamesUsed;
+  // Rename allowance is enforced server-side; GET /organization reports usage
+  const renamesUsed = (existingOrg?.renames_used as number) ?? 0;
+  const maxRenames = (existingOrg?.max_renames as number) ?? 1;
+  const renamesLeft = maxRenames - renamesUsed;
   const atLimit = existingOrg && renamesLeft <= 0;
   const validationError = orgName.length > 0 && orgName.trim() !== (existingOrg?.name as string ?? '')
     ? validateOrgName(orgName) : null;
@@ -893,16 +883,18 @@ function OrgTab({ existingOrg, setExistingOrg }: {
     try {
       if (existingOrg) {
         const result = await updateOrganization(orgName.trim());
-        recordRename();
-        setRenamesUsed(getRenameCount());
         setMsg({ text: 'Organization name updated.', type: 'success' });
         setEditingName(false);
-        setExistingOrg({ ...existingOrg, name: orgName.trim(), slug: result.slug ?? existingOrg.slug });
+        setExistingOrg({
+          ...existingOrg,
+          name: orgName.trim(),
+          slug: result.slug ?? existingOrg.slug,
+          renames_used: result.renames_used ?? renamesUsed + 1,
+          max_renames: result.max_renames ?? maxRenames,
+        });
       } else {
         const data = await createOrganization(orgName.trim());
-        try { localStorage.setItem(RENAME_KEY, '0'); } catch {}
-        setRenamesUsed(0);
-        setExistingOrg({ id: data.org_id, name: data.name, slug: data.slug });
+        setExistingOrg({ id: data.org_id, name: data.name, slug: data.slug, renames_used: 0, max_renames: maxRenames });
         setMsg({ text: `Organization "${data.name}" created.`, type: 'success' });
       }
     } catch (err: unknown) {
@@ -1052,35 +1044,90 @@ function OrgTab({ existingOrg, setExistingOrg }: {
       </Section>
 
       {/* Danger zone */}
-      {existingOrg && (
-        <div
-          className="rounded-xl border overflow-hidden"
-          style={{ borderColor: 'var(--ds-error-border)' }}
-        >
-          <div className="px-6 py-4 border-b" style={{ background: 'var(--ds-error-muted)', borderColor: 'var(--ds-error-border)' }}>
-            <h3 className="text-[15px] font-semibold" style={{ color: 'var(--ds-error)' }}>Danger zone</h3>
-            <p className="mt-0.5 text-[13px] text-content-3">Irreversible actions — proceed with caution</p>
+      {existingOrg && <DeleteOrgSection orgName={existingOrg.name as string} />}
+    </div>
+  );
+}
+
+function DeleteOrgSection({ orgName }: { orgName: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const match = confirmText.trim().toLowerCase() === (orgName || '').toLowerCase();
+
+  const handleDelete = async () => {
+    if (!match || deleting) return;
+    setDeleting(true);
+    setMsg(null);
+    try {
+      await deleteOrganization();
+      // Active connection may have been org-scoped and is gone now
+      localStorage.removeItem('iq-connection');
+      window.location.reload();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setMsg({ text: e.response?.data?.detail || 'Failed to delete the organization.', type: 'error' });
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-xl border overflow-hidden"
+      style={{ borderColor: 'var(--ds-error-border)' }}
+    >
+      <div className="px-6 py-4 border-b" style={{ background: 'var(--ds-error-muted)', borderColor: 'var(--ds-error-border)' }}>
+        <h3 className="text-[15px] font-semibold" style={{ color: 'var(--ds-error)' }}>Danger zone</h3>
+        <p className="mt-0.5 text-[13px] text-content-3">Irreversible actions — proceed with caution</p>
+      </div>
+      <div className="p-6 space-y-4" style={{ background: 'var(--ds-base-0)' }}>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[14px] font-medium text-content-1">Delete organization</p>
+            <p className="text-[13px] text-content-3 mt-0.5">
+              Permanently removes the organization, its connections and query history, and releases all members. This cannot be undone.
+            </p>
           </div>
-          <div className="p-6" style={{ background: 'var(--ds-base-0)' }}>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[14px] font-medium text-content-1">Delete organization</p>
-                <p className="text-[13px] text-content-3 mt-0.5">
-                  Permanently removes the organization, all connections, and member access. This cannot be undone.
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                className="flex-shrink-0 text-[13px] font-medium border"
-                style={{ color: 'var(--ds-error)', borderColor: 'var(--ds-error-border)', background: 'transparent' }}
-                onClick={() => alert('Contact support@intelliquery.ai to delete your organization.')}
-              >
-                Delete organization
-              </Button>
-            </div>
-          </div>
+          <Button
+            variant="ghost"
+            className="flex-shrink-0 gap-2 text-[13px] font-medium border"
+            style={{ color: 'var(--ds-error)', borderColor: 'var(--ds-error-border)', background: 'transparent' }}
+            onClick={() => { setConfirming(v => !v); setConfirmText(''); setMsg(null); }}
+          >
+            <Trash2 className="h-4 w-4" />
+            {confirming ? 'Cancel' : 'Delete organization'}
+          </Button>
         </div>
-      )}
+
+        {confirming && (
+          <div className="space-y-3 rounded-lg px-3.5 py-3" style={{ background: 'var(--ds-error-muted)', border: '1px solid var(--ds-error-border)' }}>
+            <p className="text-[13px] text-content-2">
+              Type <span className="font-semibold">{orgName}</span> to confirm.
+            </p>
+            <Input
+              placeholder={orgName}
+              value={confirmText}
+              onChange={e => setConfirmText(e.target.value)}
+              autoFocus
+              className="h-9 text-[13px]"
+            />
+            <Button
+              size="sm"
+              onClick={handleDelete}
+              disabled={!match || deleting}
+              className="h-8 gap-1.5 text-[12px]"
+              style={{ background: 'var(--ds-error)', color: 'white' }}
+            >
+              {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Permanently delete organization
+            </Button>
+          </div>
+        )}
+
+        {msg && <StatusMessage message={msg.text} type={msg.type} />}
+      </div>
     </div>
   );
 }

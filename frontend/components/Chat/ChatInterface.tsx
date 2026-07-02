@@ -54,6 +54,8 @@ interface ChatMessage {
   data?: Record<string, unknown>[];
   executionTime?: number;
   status: 'thinking' | 'ready' | 'error';
+  /** What the app is really doing while status === 'thinking' */
+  thinkingLabel?: string;
   errorMessage?: string;
   // UI state
   runExpanded: boolean;
@@ -67,47 +69,40 @@ interface ChatMessage {
   isConversational?: boolean;
 }
 
-/* ── AI workflow stages ─────────────────────────────────────── */
+/* ── AI thinking indicator ──────────────────────────────────── */
 
-const WORKFLOW_STAGES = [
-  'Understanding your question',
-  'Analyzing database schema',
-  'Selecting relevant tables',
-  'Generating optimized SQL',
-  'Validating query',
-  'Executing query',
-  'Analyzing results',
-  'Generating AI insights',
-];
-
-function AIThinkingStages() {
-  const [stageIdx, setStageIdx] = useState(0);
+/*
+ * The backend answers in a single request with no progress events, so this
+ * shows what is truthfully known: what kind of work is running and for how
+ * long — no invented pipeline stages.
+ */
+function AIThinking({ label = 'Analyzing your question and writing SQL' }: { label?: string }) {
+  const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => {
-      setStageIdx((i) => Math.min(i + 1, WORKFLOW_STAGES.length - 1));
-    }, 1350);
+    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(t);
   }, []);
 
-  const label = WORKFLOW_STAGES[stageIdx];
-
   return (
-    <div className="px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-2.5"
+    <div className="px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-2.5 flex-wrap"
       style={{ background: 'var(--ds-base-1)', border: '1px solid var(--ds-border-subtle)' }}
     >
       <Loader2 className="h-3.5 w-3.5 text-brand flex-shrink-0 animate-spin" />
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={stageIdx}
-          initial={{ opacity: 0, y: 3 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -3 }}
-          transition={{ duration: 0.15 }}
-          className="text-[13px] text-content-2"
-        >
-          {label}…
-        </motion.span>
+      <span className="text-[13px] text-content-2">
+        {label}…
+        {seconds >= 3 && <span className="text-content-3 tabular-nums"> {seconds}s</span>}
+      </span>
+      <AnimatePresence>
+        {seconds >= 8 && (
+          <motion.span
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-[12px] text-content-3"
+          >
+            Still working — complex questions can take a little longer.
+          </motion.span>
+        )}
       </AnimatePresence>
     </div>
   );
@@ -367,7 +362,7 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect, onRetry
 
         <div className="flex-1 min-w-0 space-y-3">
           {/* Thinking state */}
-          {msg.status === 'thinking' && <AIThinkingStages />}
+          {msg.status === 'thinking' && <AIThinking label={msg.thinkingLabel} />}
 
           {/* Error state */}
           {msg.status === 'error' && (
@@ -969,7 +964,7 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
       const id = `msg-${Date.now()}`;
       setMessages(prev => [
         ...prev,
-        { id, userQuery: query, status: 'thinking', runExpanded: false, insightsExpanded: false, saveOpen: false, snippetTitle: '', copied: false, sqlEditing: false, editedSql: '', isRunningEdit: false },
+        { id, userQuery: query, status: 'thinking', thinkingLabel: 'Thinking', runExpanded: false, insightsExpanded: false, saveOpen: false, snippetTitle: '', copied: false, sqlEditing: false, editedSql: '', isRunningEdit: false },
       ]);
       if (typeof overrideQuery !== 'string') {
         setInput('');
@@ -1059,7 +1054,7 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
     const id = `msg-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
-      { id, userQuery: question, status: 'thinking', runExpanded: false, insightsExpanded: false, saveOpen: false, snippetTitle: '', copied: false, sqlEditing: false, editedSql: '', isRunningEdit: false },
+      { id, userQuery: question, status: 'thinking', thinkingLabel: 'Running saved SQL', runExpanded: false, insightsExpanded: false, saveOpen: false, snippetTitle: '', copied: false, sqlEditing: false, editedSql: '', isRunningEdit: false },
     ]);
     setIsSubmitting(true);
     let succeeded = false;

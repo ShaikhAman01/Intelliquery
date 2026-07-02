@@ -5,6 +5,7 @@ import { useStore, type Connection } from '@/lib/store';
 import { getConnections, deleteConnection, toggleConnectionStatus, testConnectionById } from '@/lib/api';
 import { type Session } from '@/lib/sessions';
 import { Tooltip } from '@/components/ui/tooltip';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Database,
   Compass,
@@ -133,19 +134,26 @@ export const Sidebar = ({
     } catch {}
   }, [activeConnectionId, setConnections, setActiveConnection]);
 
-  const handleRemoveConnection = useCallback(async (id: number) => {
-    if (!confirm('Permanently remove this database connection?')) return;
+  /* Remove connection — two-step: the menu click opens the confirm dialog */
+  const [pendingRemoveId, setPendingRemoveId] = useState<number | null>(null);
+
+  const handleRemoveConnection = useCallback((id: number) => {
+    setActiveMenuConnId(null);
+    setPendingRemoveId(id);
+  }, []);
+
+  const confirmRemoveConnection = useCallback(async () => {
+    if (pendingRemoveId === null) return;
     try {
-      await deleteConnection(id);
+      await deleteConnection(pendingRemoveId);
       const updated = await getConnections();
       setConnections(updated);
-      if (activeConnectionId === id) {
+      if (activeConnectionId === pendingRemoveId) {
         const next = updated.find((c: any) => c.is_active !== false);
         setActiveConnection(next?.id ?? null);
       }
-      setActiveMenuConnId(null);
     } catch {}
-  }, [activeConnectionId, setConnections, setActiveConnection]);
+  }, [pendingRemoveId, activeConnectionId, setConnections, setActiveConnection]);
 
   const handleTestConnection = useCallback(async (connId: number) => {
     setTestingConnId(connId);
@@ -183,6 +191,16 @@ export const Sidebar = ({
       ].join(' ')}
       style={{ background: 'var(--ds-base-1)' }}
     >
+
+      <ConfirmDialog
+        open={pendingRemoveId !== null}
+        onOpenChange={(open) => { if (!open) setPendingRemoveId(null); }}
+        title="Remove connection?"
+        description="This permanently removes the database connection and its cached schema. Saved queries that use it will stop working."
+        confirmLabel="Remove connection"
+        destructive
+        onConfirm={confirmRemoveConnection}
+      />
 
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="flex items-center h-14 px-3 border-b border-border flex-shrink-0 gap-2 overflow-hidden">
