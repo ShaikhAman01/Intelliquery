@@ -13,6 +13,7 @@ import { sendQuery, executeSQL, getSchema, createSampleConnection } from '@/lib/
 import { useToast } from '@/components/ui/toaster';
 import { ResultsTable } from '@/components/Chat/ResultsTable';
 import { InsightsView, type AIInsights } from '@/components/Chat/InsightsView';
+import { VoiceButton } from '@/components/Chat/VoiceButton';
 import { Button } from '@/components/ui/button';
 import {
   Play,
@@ -1287,6 +1288,21 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
               rows={1}
               className="flex-1 resize-none bg-transparent text-[15px] text-content-1 placeholder:text-content-3 outline-none leading-relaxed disabled:cursor-not-allowed"
               style={{ maxHeight: 180, minHeight: 28 }}
+            />
+            <VoiceButton
+              disabled={!activeConnectionId || isSubmitting}
+              onTranscript={(text) => {
+                setInput(prev => (prev ? prev.trimEnd() + ' ' : '') + text);
+                setTimeout(() => {
+                  const el = textareaRef.current;
+                  if (el) {
+                    el.focus();
+                    el.style.height = 'auto';
+                    el.style.height = Math.min(el.scrollHeight, 180) + 'px';
+                  }
+                }, 0);
+              }}
+              onError={(message) => toast(message, 'error')}
             />
             <button
               type="button"
