@@ -3,7 +3,7 @@
 IntelliQuery is an AI-powered natural language interface for querying databases.
 Ask questions in plain English (text or voice) and get back SQL results, charts, and AI-generated insights.
 
-## ✨ Features
+## Features
 
 * Natural language → SQL powered by OpenAI (GPT-4o mini), with Gemini as automatic fallback and one-shot SQL error repair
 * Voice input via OpenAI Whisper for hands-free querying
@@ -13,7 +13,7 @@ Ask questions in plain English (text or voice) and get back SQL results, charts,
 * Teams with email invitations and invite links
 * Session history with search
 
-## 📁 Structure
+## Structure
 
 ```
 IntelliQuery/
@@ -21,13 +21,13 @@ IntelliQuery/
 └── frontend/   # Next.js 16 + Better Auth
 ```
 
-## ⚙️ Requirements
+## Requirements
 
 * Python 3.10+
 * Node.js 18+
 * PostgreSQL
 
-## 🔐 Setup
+## Setup
 
 ### Backend
 
@@ -51,6 +51,6 @@ npm run dev
 
 Runs on http://localhost:3000
 
-## ⚠️ Notes
+## Notes
 
 * Start the backend before the frontend
