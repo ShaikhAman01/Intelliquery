@@ -75,8 +75,8 @@ export default function PrivacyPage() {
       <InfoSection title="7. Contact">
         <p>
           Privacy questions or data requests:{' '}
-          <a href="mailto:support@intelliquery.ai" className="text-brand underline">
-            support@intelliquery.ai
+          <a href="mailto:shaikhaman.0020@gmail.com" className="text-brand underline">
+            shaikhaman.0020@gmail.com
           </a>.
         </p>
       </InfoSection>

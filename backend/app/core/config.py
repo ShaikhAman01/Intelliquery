@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     SMTP_SECURE: bool = False
     SMTP_USER: str = ""
     SMTP_PASS: str = ""
-    EMAIL_FROM: str = "Intelliquery <noreply@intelliquery.com>"
+    EMAIL_FROM: str = "Intelliquery <shaikhaman.0020@gmail.com>"
 
     # Where invite links point (the Next.js app)
     FRONTEND_URL: str = "http://localhost:3000"

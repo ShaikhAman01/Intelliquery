@@ -77,8 +77,8 @@ export default function TermsPage() {
       <InfoSection title="9. Contact">
         <p>
           Questions about these terms? Contact us at{' '}
-          <a href="mailto:support@intelliquery.ai" className="text-brand underline">
-            support@intelliquery.ai
+          <a href="mailto:shaikhaman.0020@gmail.com" className="text-brand underline">
+            shaikhaman.0020@gmail.com
           </a>.
         </p>
       </InfoSection>

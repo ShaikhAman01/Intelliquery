@@ -24,7 +24,7 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
   });
 
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM || "Intelliquery <noreply@intelliquery.com>",
+    from: process.env.EMAIL_FROM || "Intelliquery <shaikhaman.0020@gmail.com>",
     to,
     subject,
     html,

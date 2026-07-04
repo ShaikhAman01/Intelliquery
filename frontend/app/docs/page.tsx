@@ -6,7 +6,7 @@ export const metadata = {
   description: 'Get started with Intelliquery: connect a database and query it in plain English.',
 };
 
-const SUPPORT_EMAIL = 'support@intelliquery.ai';
+const SUPPORT_EMAIL = 'shaikhaman.0020@gmail.com';
 
 function Code({ children }: { children: React.ReactNode }) {
   return (

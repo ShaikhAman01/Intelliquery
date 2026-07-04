@@ -194,8 +194,8 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
               <p className="px-3 py-1.5 text-[10.5px] font-semibold text-content-3 uppercase tracking-wider">Help & Support</p>
               {[
                 { label: 'Documentation', href: '/docs', Icon: BookOpen, external: false },
-                { label: 'Contact Support', href: 'mailto:support@intelliquery.ai', Icon: MessageCircle, external: true },
-                { label: 'Report a Bug', href: 'mailto:support@intelliquery.ai?subject=Bug%20report', Icon: Bug, external: true },
+                { label: 'Contact Support', href: 'mailto:shaikhaman.0020@gmail.com', Icon: MessageCircle, external: true },
+                { label: 'Report a Bug', href: 'mailto:shaikhaman.0020@gmail.com?subject=Bug%20report', Icon: Bug, external: true },
               ].map(({ label, href, Icon, external }) => {
                 const cls = 'flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-content-2 hover:bg-base-2 hover:text-content-1 transition-colors';
                 return external ? (
