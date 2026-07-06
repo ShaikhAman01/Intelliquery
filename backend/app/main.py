@@ -20,6 +20,10 @@ engine = create_engine(settings.DATABASE_URL)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not settings.RUN_STARTUP_MIGRATIONS:
+        yield
+        return
+
     print("Starting up: Creating database tables...")
     Base.metadata.create_all(bind=engine)
 

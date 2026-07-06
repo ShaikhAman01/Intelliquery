@@ -2,7 +2,7 @@
 
 import { authClient } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, ReactNode } from 'react';
+import { useEffect, ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 
 interface User {
@@ -17,34 +17,14 @@ interface Session {
     user: User;
 }
 
-/**
- * Hook to get the current session. Returns { session, user, isLoading }.
- * Session comes from Better Auth client.
- */
 export function useSession() {
-    const [session, setSession] = useState<Session | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        authClient.getSession().then(({ data, error }) => {
-            if (cancelled) return;
-            if (data && !error) {
-                setSession(data as unknown as Session);
-            } else {
-                setSession(null);
-            }
-            setIsLoading(false);
-        });
-
-        return () => { cancelled = true; };
-    }, []);
+    const { data, isPending } = authClient.useSession();
+    const session = (data as unknown as Session | null) ?? null;
 
     return {
         session,
         user: session?.user ?? null,
-        isLoading,
+        isLoading: isPending,
     };
 }
 

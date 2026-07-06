@@ -2,7 +2,12 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChartPanel } from '@/components/Chat/Visualizer';
+import dynamic from 'next/dynamic';
+
+const ChartPanel = dynamic(
+  () => import('@/components/Chat/Visualizer').then(m => m.ChartPanel),
+  { ssr: false },
+);
 import { SQLDisplay } from '@/components/Query/SQLDisplay';
 import { ResultsTable } from '@/components/Chat/ResultsTable';
 import { Button } from '@/components/ui/button';

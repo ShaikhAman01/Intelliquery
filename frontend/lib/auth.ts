@@ -15,6 +15,12 @@ const pool = new Pool({
 
 export const auth = betterAuth({
   database: pool,
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
   emailAndPassword: {
     enabled: true,
     // Verification is encouraged, not enforced: sign-in stays instant so a

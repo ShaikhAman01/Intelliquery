@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     ENCRYPTION_KEY: str
 
+    RUN_STARTUP_MIGRATIONS: bool = True
+
     # LLM Providers
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: Optional[str] = None
