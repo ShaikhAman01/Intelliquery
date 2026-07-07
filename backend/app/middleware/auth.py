@@ -50,8 +50,10 @@ def _extract_token(request: Request) -> Optional[str]:
     """
     from urllib.parse import unquote
 
-    # 1. Try cookie (Better Auth default)
-    raw = request.cookies.get("better-auth.session_token")
+    # 1. Try cookie (Better Auth default; __Secure- prefix is used on HTTPS)
+    raw = request.cookies.get("better-auth.session_token") or request.cookies.get(
+        "__Secure-better-auth.session_token"
+    )
     if raw:
         decoded = unquote(raw)          # URL-decode (%2B -> +, etc.)
         return decoded.split(".")[0]    # Take only the token ID part
