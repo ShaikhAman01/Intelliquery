@@ -1,10 +1,16 @@
 import re
-import spacy
 from typing import Dict, List, Any
 from datetime import datetime, timedelta
 
-# Load the small English model
-nlp = spacy.load("en_core_web_sm")
+_nlp = None
+
+
+def _get_nlp():
+    global _nlp
+    if _nlp is None:
+        import spacy
+        _nlp = spacy.load("en_core_web_sm")
+    return _nlp
 
 
 class NLPProcessor:
@@ -48,7 +54,7 @@ class NLPProcessor:
         ]
 
     def process(self, text: str) -> Dict[str, Any]:
-        doc = nlp(text)
+        doc = _get_nlp()(text)
         text_lower = text.lower()
 
         # 1. Complexity detection

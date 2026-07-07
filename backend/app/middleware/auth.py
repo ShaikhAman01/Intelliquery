@@ -67,7 +67,7 @@ def _extract_token(request: Request) -> Optional[str]:
 
 # ── Core dependency: get current authenticated user ──────────────────────────
 
-async def get_current_user(
+def get_current_user(
     request: Request,
     db: Session = Depends(get_db),
 ) -> User:
@@ -136,7 +136,7 @@ def require_role(min_role: str):
     """
     min_level = ROLE_MAP.get(min_role, Role.VIEWER)
 
-    async def _check_role(
+    def _check_role(
         current_user: User = Depends(get_current_user),
     ) -> User:
         user_level = ROLE_MAP.get(current_user.role or "viewer", Role.VIEWER)

@@ -40,7 +40,7 @@ export function InfoPage({
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-6 py-12">
+        <div className="max-w-[760px] mx-auto px-6 py-12">
           <h1 className="text-[28px] font-bold tracking-tight text-content-1">{title}</h1>
           {subtitle && <p className="mt-2 text-[14px] text-content-3">{subtitle}</p>}
           <div className="mt-8 space-y-8">{children}</div>
