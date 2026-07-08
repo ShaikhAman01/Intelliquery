@@ -116,6 +116,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+API_ROOTS = ("/query", "/connections", "/history", "/voice", "/schema", "/settings", "/snippets")
+
+
+class StrippedPrefixMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"].startswith(API_ROOTS):
+            scope["path"] = "/api/v1" + scope["path"]
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(StrippedPrefixMiddleware)
+
 # ── Middleware ────────────────────────────────────────────────────────────────
 
 origins = [
