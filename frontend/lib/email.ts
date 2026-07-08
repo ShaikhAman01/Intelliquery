@@ -18,7 +18,6 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || "587", 10),
     secure: process.env.SMTP_SECURE === "true",
-    family: 4,
     connectionTimeout: 10000,
     auth: process.env.SMTP_USER
       ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
