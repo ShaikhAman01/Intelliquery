@@ -23,7 +23,11 @@ def _prefer_ipv4(dialect, conn_rec, cargs, cparams):
     host = cparams.get("host")
     if host and "hostaddr" not in cparams:
         try:
-            cparams["hostaddr"] = socket.gethostbyname(host)
+            infos = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
+            ips = list(dict.fromkeys(info[4][0] for info in infos))
+            if ips:
+                cparams["hostaddr"] = ",".join(ips)
+                cparams["host"] = ",".join([host] * len(ips))
         except OSError:
             pass
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -13,7 +13,7 @@ from datetime import datetime
 
 from app.api.deps import get_db
 from app.models.core import User, Organization, OrgInvite, DbConnection, QueryHistory, SavedSnippet
-from app.middleware.auth import get_current_user, require_viewer, require_admin, require_owner
+from app.middleware.auth import get_current_user, require_viewer, require_admin, require_owner, require_verified_admin, require_verified_user
 from app.core.config import settings
 from app.core.emailer import send_email, team_invite_email
 from app.core.logger import logger
@@ -93,7 +93,7 @@ def update_profile(
 def create_organization(
     data: OrgCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ):
     """Create a new organization and make current user the owner."""
     if current_user.org_id:
@@ -264,7 +264,7 @@ def list_team_members(
 def invite_team_member(
     data: TeamInvite,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_verified_admin),
 ):
     """Email an invitation. The invitee does not need an account yet. Requires admin role."""
     if not current_user.org_id:
@@ -329,7 +329,7 @@ def invite_team_member(
 def create_invite_link(
     data: InviteLink,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_verified_admin),
 ):
     """Create (or reuse) a shareable invite link with an explicit role. Requires admin role."""
     if not current_user.org_id:

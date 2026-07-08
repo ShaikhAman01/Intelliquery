@@ -127,6 +127,8 @@ class DynamicSQLGenerator:
                 if not order_col:
                     if (sort_keyword or "").lower() in self.QUALIFIER_SORT_KEYWORDS:
                         return None  # unresolvable quality — needs the LLM
+                    if grouping_keys and not self._resolve_column(grouping_keys, all_columns):
+                        return None  # "by <thing>" names no column here — needs the LLM
                     # Plain "top N records": fall back to a metric, else PK order
                     order_col = (metric_columns or numeric_columns or [None])[0]
             return self._build_select(table_name, cols, where_clauses, sort_order, effective_limit, order_col)

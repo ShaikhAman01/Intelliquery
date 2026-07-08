@@ -158,9 +158,26 @@ def require_role(min_role: str):
     return _check_role
 
 
+def require_verified_role(min_role: str):
+    role_dep = require_role(min_role)
+
+    def _check_verified(current_user: User = Depends(role_dep)) -> User:
+        if not current_user.emailVerified:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Please verify your email address to use this feature. You can resend the verification link from Settings.",
+            )
+        return current_user
+
+    return _check_verified
+
+
 # ── Convenience shortcuts ────────────────────────────────────────────────────
 
 require_viewer = require_role("viewer")
 require_editor = require_role("editor")
 require_admin = require_role("admin")
 require_owner = require_role("owner")
+require_verified_editor = require_verified_role("editor")
+require_verified_admin = require_verified_role("admin")
+require_verified_user = require_verified_role("viewer")

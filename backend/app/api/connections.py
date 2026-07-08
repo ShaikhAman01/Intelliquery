@@ -6,7 +6,7 @@ from datetime import datetime
 
 from app.api.deps import get_db
 from app.models.core import DbConnection, User
-from app.middleware.auth import get_current_user, require_viewer, require_editor, require_admin
+from app.middleware.auth import get_current_user, require_viewer, require_editor, require_admin, require_verified_editor
 from app.core.security import encrypt_password, decrypt_password
 from app.pipeline.schema_mapper import SchemaMapper
 from app.core.client_db_manager import ClientDBManager
@@ -130,7 +130,7 @@ def test_saved_connection(
 def create_connection(
     conn_data: ConnectionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_editor),
+    current_user: User = Depends(require_verified_editor),
 ):
     """
     1. Encrypts the password.
