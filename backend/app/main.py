@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -116,20 +118,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-API_ROOTS = ("/query", "/connections", "/history", "/voice", "/schema", "/settings", "/snippets")
-
-
-class StrippedPrefixMiddleware:
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope["type"] == "http" and scope["path"].startswith(API_ROOTS):
-            scope["path"] = "/api/v1" + scope["path"]
-        await self.app(scope, receive, send)
-
-
-app.add_middleware(StrippedPrefixMiddleware)
+# On Vercel this FastAPI service is mounted at routePrefix "/api/v1" (see
+# vercel.json). Vercel strips that prefix from the path AND sets the ASGI
+# root_path to "/api/v1", which Starlette strips again during route matching.
+# So in production our routes must be registered WITHOUT the "/api/v1" prefix.
+# Locally there is no proxy, but the frontend still calls "/api/v1/..." (see
+# frontend/lib/api.ts), so we keep the prefix there. VERCEL is set
+# automatically on every Vercel deployment.
+API_PREFIX = "" if os.getenv("VERCEL") else "/api/v1"
 
 # ── Middleware ────────────────────────────────────────────────────────────────
 
@@ -166,45 +162,45 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(
     query_router.router,
-    prefix="/api/v1/query",
+    prefix=f"{API_PREFIX}/query",
     tags=["Query Engine"],
 )
 
 app.include_router(
     connections.router,
-    prefix="/api/v1/connections",
+    prefix=f"{API_PREFIX}/connections",
     tags=["Database Connections"],
 )
 
 app.include_router(
     history.router,
-    prefix="/api/v1/history",
+    prefix=f"{API_PREFIX}/history",
     tags=["Query History"],
 )
 
 app.include_router(
     voice.router,
-    prefix="/api/v1/voice",
+    prefix=f"{API_PREFIX}/voice",
     tags=["Voice Input"],
 )
 
 app.include_router(
     schema_explorer.router,
-    prefix="/api/v1/schema",
+    prefix=f"{API_PREFIX}/schema",
     tags=["Schema Explorer"],
 )
 
 app.include_router(
     settings_api.router,
-    prefix="/api/v1/settings",
+    prefix=f"{API_PREFIX}/settings",
     tags=["Settings"],
 )
 
 app.include_router(
-    snippets_api.router, 
-    prefix="/api/v1/snippets", 
+    snippets_api.router,
+    prefix=f"{API_PREFIX}/snippets",
     tags=["Snippets"])
 
-@app.get("/health")
+@app.get(f"{API_PREFIX}/health")
 def health_check():
     return {"status": "running", "version": "1.0.0"}
