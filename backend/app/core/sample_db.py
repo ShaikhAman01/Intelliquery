@@ -17,6 +17,7 @@ Layout:
 
 import os
 import sqlite3
+import tempfile
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -24,8 +25,8 @@ from random import Random
 
 from app.core.logger import logger
 
-# backend/data/sample_ecommerce.db  (generated at runtime, gitignored)
-SAMPLE_DB_DIR = Path(__file__).resolve().parents[2] / "data"
+# Writable, regenerable location (/tmp on Vercel, which is read-only elsewhere).
+SAMPLE_DB_DIR = Path(tempfile.gettempdir()) / "intelliquery"
 SAMPLE_DB_PATH = SAMPLE_DB_DIR / "sample_ecommerce.db"
 
 SAMPLE_CONNECTION_NAME = "Sample E-commerce Store"

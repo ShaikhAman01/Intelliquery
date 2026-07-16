@@ -53,6 +53,9 @@ class ClientDBManager:
         db_url = cls._build_url(connection_model, real_password)
 
         if connection_model.db_type == "sqlite":
+            from app.core.sample_db import SAMPLE_DB_PATH, ensure_sample_db
+            if connection_model.db_name == str(SAMPLE_DB_PATH):
+                ensure_sample_db()
             # SQLite is a file — single shared connection, thread-safe via lock
             engine = create_engine(
                 db_url,
