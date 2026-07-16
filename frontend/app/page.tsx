@@ -34,7 +34,7 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex h-[100dvh] w-screen items-center justify-center bg-base-0">
+      <div className="flex h-full w-full items-center justify-center bg-base-0">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-5 w-5 animate-spin text-content-3" />
           <p className="text-[11px] font-medium text-content-3 uppercase tracking-widest">
@@ -125,7 +125,7 @@ function AppShell({ userId }: { userId: string }) {
   }, []);
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-base-0">
+    <div className="relative flex h-full w-full overflow-hidden bg-base-0">
       <Sidebar
         activeView={activeView}
         onViewChange={setActiveView}

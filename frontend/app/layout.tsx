@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/Providers/ThemeProvider";
 import { ToastProvider } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { VerifyEmailBanner } from "@/components/Layout/VerifyEmailBanner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -42,7 +43,12 @@ export default function RootLayout({
         <ThemeProvider defaultTheme="light" storageKey="intelliquery-theme">
           <TooltipProvider delayDuration={400}>
             <ToastProvider>
-              {children}
+              <div className="flex h-[100dvh] flex-col">
+                <VerifyEmailBanner />
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  {children}
+                </div>
+              </div>
             </ToastProvider>
           </TooltipProvider>
         </ThemeProvider>
