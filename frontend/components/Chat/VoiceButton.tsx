@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, Square, Loader2 } from 'lucide-react';
 import { transcribeAudio } from '@/lib/api';
+import { BorderBeam } from 'border-beam';
 
 interface VoiceButtonProps {
   /** Receives the final transcript; the caller decides what to do with it. */
@@ -229,30 +230,32 @@ export function VoiceButton({ onTranscript, onError, disabled = false }: VoiceBu
           ))}
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => (recording ? stopRecording() : startRecording())}
-        disabled={disabled || processing}
-        className={[
-          'h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors duration-[100ms]',
-          disabled ? 'opacity-30 cursor-not-allowed' : '',
-        ].join(' ')}
-        style={
-          recording
-            ? { background: 'var(--ds-error-muted)', border: '1px solid var(--ds-error-border)', color: 'var(--ds-error)', animation: 'voice-pulse 1.6s ease-out infinite' }
-            : { background: 'var(--ds-base-2)', border: '1px solid var(--ds-border-subtle)', color: 'var(--ds-text-2)' }
-        }
-        aria-label={recording ? 'Stop recording' : 'Ask with your voice'}
-        title={recording ? 'Stop recording' : 'Ask with your voice'}
-      >
-        {processing ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : recording ? (
-          <Square className="h-3.5 w-3.5 fill-current" />
-        ) : (
-          <Mic className="h-4 w-4" />
-        )}
-      </button>
+      <BorderBeam size="sm" theme="auto" colorVariant="sunset" active={recording}>
+        <button
+          type="button"
+          onClick={() => (recording ? stopRecording() : startRecording())}
+          disabled={disabled || processing}
+          className={[
+            'h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors duration-[100ms]',
+            disabled ? 'opacity-30 cursor-not-allowed' : '',
+          ].join(' ')}
+          style={
+            recording
+              ? { background: 'var(--ds-error-muted)', color: 'var(--ds-error)' }
+              : { background: 'var(--ds-base-2)', border: '1px solid var(--ds-border-subtle)', color: 'var(--ds-text-2)' }
+          }
+          aria-label={recording ? 'Stop recording' : 'Ask with your voice'}
+          title={recording ? 'Stop recording' : 'Ask with your voice'}
+        >
+          {processing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : recording ? (
+            <Square className="h-3.5 w-3.5 fill-current" />
+          ) : (
+            <Mic className="h-4 w-4" />
+          )}
+        </button>
+      </BorderBeam>
     </div>
   );
 }
