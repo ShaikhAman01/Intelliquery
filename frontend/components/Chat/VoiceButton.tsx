@@ -230,7 +230,7 @@ export function VoiceButton({ onTranscript, onError, disabled = false }: VoiceBu
           ))}
         </div>
       )}
-      <BorderBeam size="sm" theme="auto" colorVariant="sunset" active={recording}>
+      <BorderBeam size="sm" theme="auto" colorVariant="sunset" strength={0.6} active={recording}>
         <button
           type="button"
           onClick={() => (recording ? stopRecording() : startRecording())}

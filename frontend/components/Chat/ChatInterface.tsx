@@ -41,7 +41,6 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
 import { ThinkingOrb } from 'thinking-orbs';
-import { BorderBeam } from 'border-beam';
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -88,12 +87,12 @@ function AIThinking({ label = 'Analyzing your question and writing SQL' }: { lab
   }, []);
 
   return (
-    <div className="px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-2.5 flex-wrap"
+    <div className="px-4 py-3.5 rounded-2xl rounded-tl-sm flex items-center gap-3 flex-wrap"
       style={{ background: 'var(--ds-base-1)' }}
     >
-      <ThinkingOrb state="working" size={64} theme="auto" className="flex-shrink-0" style={{ width: 24, height: 24, display: 'block' }} />
-      <span className="text-[13px] text-content-2">
-        {label}…
+      <ThinkingOrb state="working" size={64} theme="auto" className="flex-shrink-0" style={{ width: 40, height: 40, display: 'block' }} />
+      <span className="text-[13px]">
+        <span className="text-shimmer" data-text={`${label}…`}>{label}…</span>
         {seconds >= 3 && <span className="text-content-3 tabular-nums"> {seconds}s</span>}
       </span>
       <AnimatePresence>
@@ -354,16 +353,7 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect, onRetry
       </div>
 
       {/* AI message */}
-      <div className="flex gap-3">
-        {/* Avatar */}
-        <div
-          className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-          style={{ background: 'var(--ds-base-3)', border: '1px solid var(--ds-border-subtle)' }}
-        >
-          <Sparkles className="h-3.5 w-3.5 text-brand" />
-        </div>
-
-        <div className="flex-1 min-w-0 space-y-3">
+      <div className="min-w-0 space-y-3">
           {/* Thinking state */}
           {msg.status === 'thinking' && <AIThinking label={msg.thinkingLabel} />}
 
@@ -648,7 +638,6 @@ function Message({ msg, onUpdate, onSaveSnippet, connectionId, onSelect, onRetry
               </AnimatePresence>
             </>
           )}
-        </div>
       </div>
     </motion.div>
   );
@@ -1269,7 +1258,6 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
           )}
 
           {/* Input box */}
-          <BorderBeam size="line" theme="auto" colorVariant="ocean" active={isSubmitting}>
           <div
             className="flex items-end gap-3 rounded-2xl border border-border px-5 py-4 transition-[border-color,box-shadow] duration-[100ms] focus-within:border-[var(--ds-border-accent)]"
             style={{
@@ -1331,7 +1319,6 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
               )}
             </button>
           </div>
-          </BorderBeam>
 
           <p className="text-center text-[13px] text-content-3">
             <kbd className="font-mono">Enter</kbd> to send &nbsp;·&nbsp; <kbd className="font-mono">Shift+Enter</kbd> for new line
