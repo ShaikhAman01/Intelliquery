@@ -53,6 +53,7 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
   const [orgName, setOrgName]           = useState<string | null>(null);
   const [invites, setInvites]           = useState<Invite[]>([]);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [avatarImgError, setAvatarImgError] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef   = useRef<HTMLDivElement>(null);
@@ -319,8 +320,8 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
               className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 text-[12px] font-bold text-white select-none overflow-hidden"
               style={{ background: 'var(--ds-accent)' }}
             >
-              {user?.image
-                ? <img src={user.image} alt={displayName} className="h-full w-full object-cover" />
+              {user?.image && !avatarImgError
+                ? <img src={user.image} alt={displayName} className="h-full w-full object-cover" onError={() => setAvatarImgError(true)} />
                 : avatarInitial
               }
             </div>
@@ -349,8 +350,8 @@ export const Header = ({ activeView = 'chat', onViewChange }: HeaderProps) => {
                     className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 text-[13px] font-bold text-white overflow-hidden"
                     style={{ background: 'var(--ds-accent)' }}
                   >
-                    {user?.image
-                      ? <img src={user.image} alt={displayName} className="h-full w-full object-cover" />
+                    {user?.image && !avatarImgError
+                      ? <img src={user.image} alt={displayName} className="h-full w-full object-cover" onError={() => setAvatarImgError(true)} />
                       : avatarInitial
                     }
                   </div>
