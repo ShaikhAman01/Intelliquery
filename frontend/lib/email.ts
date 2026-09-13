@@ -32,7 +32,7 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
   });
 }
 
-const SITE_URL = "https://intelliquery.shaikhaman.dev";
+const SITE_URL = "https://intelliquery.shaikhaman.in";
 const ACCENT = "#2563eb";
 
 interface EmailShellOptions {

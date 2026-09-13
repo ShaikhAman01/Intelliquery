@@ -39,7 +39,7 @@ def send_email(to: str, subject: str, html: str) -> None:
         server.quit()
 
 
-SITE_URL = "https://intelliquery.shaikhaman.dev"
+SITE_URL = "https://intelliquery.shaikhaman.in"
 ACCENT = "#2563eb"
 
 
