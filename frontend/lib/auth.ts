@@ -13,7 +13,14 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+const BASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "https://intelliquery.shaikhaman.in"
+    : "http://localhost:3000";
+
 export const auth = betterAuth({
+  baseURL: BASE_URL,
+  trustedOrigins: [BASE_URL],
   database: pool,
   session: {
     cookieCache: {

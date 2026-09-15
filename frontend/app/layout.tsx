@@ -17,6 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://intelliquery.shaikhaman.in"),
   title: "Intelliquery – AI-Powered SQL Generation",
   description: "Transform natural language into SQL queries with AI. Connect your database and ask questions in plain English.",
   openGraph: {
