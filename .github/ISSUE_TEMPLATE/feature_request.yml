@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest something Intelliquery should be able to do.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the situation rather than the solution — it usually leads somewhere better.
+      placeholder: I work across three databases and have to re-pick the connection every time I open a new chat.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to see?
+      placeholder: Remember the last connection used per workspace, or let me pin a default.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app?
+      options:
+        - Query / SQL generation
+        - Results table
+        - Charts or insights
+        - Database connections
+        - Sign-in / account
+        - Settings
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you have tried instead?
+      description: Workarounds you are using today, or other tools that get this right.
+    validations:
+      required: false

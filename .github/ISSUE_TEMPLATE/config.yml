@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security issue
+    url: https://github.com/ShaikhAman01/Intelliquery/security/advisories/new
+    about: Report a vulnerability privately rather than in a public issue.
+  - name: Documentation
+    url: https://intelliquery.shaikhaman.in/docs
+    about: How connections, query safety and the AI pipeline work.

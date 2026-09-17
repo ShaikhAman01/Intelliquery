@@ -1,0 +1,81 @@
+name: Bug report
+description: Something in Intelliquery is broken or behaving unexpectedly.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this.
+
+        **Please do not paste real database credentials, connection strings, or
+        query results containing personal data.** Redact anything sensitive —
+        a shape like `SELECT ... FROM customers` is plenty.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you get instead?
+      placeholder: I asked "top 10 customers by revenue" and the chart rendered empty, though the results table had 10 rows.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Connect a PostgreSQL database
+        2. Ask "..."
+        3. Open the Chart tab
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app?
+      options:
+        - Query / SQL generation
+        - Results table
+        - Charts or insights
+        - Database connections
+        - Sign-in / account
+        - Settings
+        - Something else
+    validations:
+      required: true
+
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Database engine
+      description: Only if the bug involves a connected database.
+      options:
+        - Not applicable
+        - PostgreSQL
+        - MySQL
+        - MariaDB
+        - SQLite
+        - SQL Server
+        - CockroachDB
+    validations:
+      required: false
+
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and OS
+      placeholder: Chrome 141 on Windows 11
+    validations:
+      required: false
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console or network errors
+      description: Anything red in the browser devtools console. This is rendered as code, so no backticks needed.
+      render: text
+    validations:
+      required: false

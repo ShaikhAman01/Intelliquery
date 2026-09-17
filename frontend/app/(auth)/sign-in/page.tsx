@@ -1,7 +1,14 @@
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import SignIn from '@/components/auth/sign-in';
 import { Database, MessageSquare, BarChart3, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Sign in — Intelliquery',
+  description: 'Sign in to Intelliquery to query your connected databases in plain English.',
+  robots: { index: false, follow: false },
+};
 
 const FEATURES = [
   { Icon: MessageSquare, text: 'Ask questions in plain English — no SQL knowledge needed' },

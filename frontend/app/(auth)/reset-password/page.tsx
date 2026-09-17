@@ -1,7 +1,14 @@
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import ResetPassword from '@/components/auth/reset-password';
 import { Database, ShieldCheck, Lock, KeyRound } from 'lucide-react';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Choose a new password — Intelliquery',
+  description: 'Set a new password for your Intelliquery account.',
+  robots: { index: false, follow: false },
+};
 
 const FEATURES = [
   { Icon: ShieldCheck, text: 'We never store your passwords in plain text' },

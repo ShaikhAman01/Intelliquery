@@ -13,6 +13,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { BUG_REPORT_URL, FEATURE_REQUEST_URL } from '@/lib/links';
 
 const FEATURES = [
   {
@@ -411,6 +412,8 @@ export function LandingPage() {
             <Link href="/privacy" className="hover:text-content-1 transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-content-1 transition-colors">Terms</Link>
             <Link href="/docs" className="hover:text-content-1 transition-colors">Documentation</Link>
+            <a href={BUG_REPORT_URL} target="_blank" rel="noreferrer" className="hover:text-content-1 transition-colors">Report a bug</a>
+            <a href={FEATURE_REQUEST_URL} target="_blank" rel="noreferrer" className="hover:text-content-1 transition-colors">Request a feature</a>
           </div>
         </div>
       </footer>

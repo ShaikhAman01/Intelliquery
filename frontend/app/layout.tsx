@@ -4,6 +4,8 @@ import { ThemeProvider } from "@/components/Providers/ThemeProvider";
 import { ToastProvider } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { VerifyEmailBanner } from "@/components/Layout/VerifyEmailBanner";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -53,6 +55,9 @@ export default function RootLayout({
             </ToastProvider>
           </TooltipProvider>
         </ThemeProvider>
+
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

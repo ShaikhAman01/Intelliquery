@@ -1,5 +1,6 @@
 import { Database } from 'lucide-react';
 import Link from 'next/link';
+import { BUG_REPORT_URL, FEATURE_REQUEST_URL } from '@/lib/links';
 
 /**
  * Shared shell for static content pages (/docs, /terms, /privacy).
@@ -53,6 +54,11 @@ export function InfoPage({
           <Link href="/terms" className="hover:text-content-1 transition-colors underline">Terms</Link> ·{' '}
           <Link href="/privacy" className="hover:text-content-1 transition-colors underline">Privacy</Link> ·{' '}
           <Link href="/docs" className="hover:text-content-1 transition-colors underline">Docs</Link>
+        </p>
+        <p className="mt-2 text-center text-[12px] text-content-3">
+          <a href={BUG_REPORT_URL} target="_blank" rel="noreferrer" className="hover:text-content-1 transition-colors underline">Report a bug</a>
+          {' · '}
+          <a href={FEATURE_REQUEST_URL} target="_blank" rel="noreferrer" className="hover:text-content-1 transition-colors underline">Request a feature</a>
         </p>
       </footer>
     </div>
