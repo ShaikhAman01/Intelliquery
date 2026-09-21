@@ -13,10 +13,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-/**
- * Demo accounts are created on a domain that cannot receive mail. Every email
- * hook checks this first so signup does not queue a message to nowhere.
- */
 export const DEMO_EMAIL_DOMAIN = "demo.intelliquery.invalid";
 
 export function isDemoEmail(email?: string | null): boolean {

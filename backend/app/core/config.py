@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # Where invite links point (the Next.js app)
     FRONTEND_URL: str = "http://localhost:3000"
 
+    # Shared read-only demo account. Blank disables the restriction entirely.
+    DEMO_ACCOUNT_EMAIL: str = ""
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

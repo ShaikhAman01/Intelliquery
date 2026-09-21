@@ -6,7 +6,7 @@ import tempfile
 import os
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from app.middleware.auth import get_current_user, require_viewer
+from app.middleware.auth import get_current_user, require_viewer, require_not_demo
 from app.models.core import User
 from app.core.config import settings
 from app.core.logger import logger
@@ -22,7 +22,7 @@ ALLOWED_AUDIO_TYPES = {
 MAX_FILE_SIZE_MB = 25
 
 
-@router.post("/transcribe")
+@router.post("/transcribe", dependencies=[Depends(require_not_demo)])
 async def transcribe_audio(
     file: UploadFile = File(...),
     current_user: User = Depends(require_viewer),

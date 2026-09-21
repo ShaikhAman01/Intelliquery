@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { BUG_REPORT_URL, FEATURE_REQUEST_URL } from '@/lib/links';
-import { DemoButton } from './demo-button';
 
 const FEATURES = [
   {
@@ -40,8 +39,6 @@ const FEATURES = [
 
 // `soon: true` engines are visible in the connection wizard but not yet connectable —
 // keep this list in sync with DB_TYPES in app/connections/new/page.tsx
-// Mirrors the section headings on /docs so the landing page and the docs
-// never drift apart.
 const DOC_LINKS = [
   {
     Icon: Plug,
@@ -167,7 +164,13 @@ export function LandingPage() {
               Start for free
               <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
             </Link>
-            <DemoButton />
+            <Link
+              href="/sign-in"
+              className="inline-flex items-center justify-center rounded-xl border border-border px-6 py-3 text-[14px] font-semibold text-content-2 transition-colors hover:bg-base-2 hover:text-content-1"
+              style={{ background: 'var(--ds-base-1)' }}
+            >
+              Sign in to your account
+            </Link>
           </motion.div>
 
           <motion.p
@@ -176,7 +179,7 @@ export function LandingPage() {
             transition={{ duration: 0.4, delay: 0.15 }}
             className="mt-3 text-[13px] text-content-3"
           >
-            The demo opens a sandbox with a sample store database. No signup, no card.
+            Free to use. Connect your own database, or explore the built-in sample store.
           </motion.p>
 
           {/* DB compatibility strip */}

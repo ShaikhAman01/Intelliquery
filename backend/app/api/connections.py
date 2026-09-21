@@ -6,7 +6,7 @@ from datetime import datetime
 
 from app.api.deps import get_db
 from app.models.core import DbConnection, User
-from app.middleware.auth import get_current_user, require_viewer, require_editor, require_admin, require_verified_editor
+from app.middleware.auth import get_current_user, require_viewer, require_editor, require_admin, require_verified_editor, require_not_demo
 from app.core.security import encrypt_password, decrypt_password
 from app.pipeline.schema_mapper import SchemaMapper
 from app.core.client_db_manager import ClientDBManager
@@ -48,7 +48,7 @@ class ConnectionStatusUpdate(BaseModel):
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
-@router.post("/test")
+@router.post("/test", dependencies=[Depends(require_not_demo)])
 def test_connection(
     conn_data: ConnectionTest,
     current_user: User = Depends(require_editor),
@@ -99,7 +99,7 @@ def test_connection(
         raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
 
 
-@router.post("/{connection_id}/test")
+@router.post("/{connection_id}/test", dependencies=[Depends(require_not_demo)])
 def test_saved_connection(
     connection_id: int,
     db: Session = Depends(get_db),
@@ -274,7 +274,7 @@ def list_connections(
     return query.all()
 
 
-@router.post("/{connection_id}/refresh")
+@router.post("/{connection_id}/refresh", dependencies=[Depends(require_not_demo)])
 def refresh_connection_schema(
     connection_id: int,
     db: Session = Depends(get_db),
@@ -309,7 +309,7 @@ def refresh_connection_schema(
         raise HTTPException(status_code=400, detail=f"Schema Sync Failed: {str(e)}")
 
 
-@router.patch("/{connection_id}/toggle")
+@router.patch("/{connection_id}/toggle", dependencies=[Depends(require_not_demo)])
 def toggle_connection_status(
     connection_id: int,
     status_data: ConnectionStatusUpdate,
@@ -332,7 +332,7 @@ def toggle_connection_status(
     }
 
 
-@router.delete("/{connection_id}")
+@router.delete("/{connection_id}", dependencies=[Depends(require_not_demo)])
 def delete_connection(
     connection_id: int,
     db: Session = Depends(get_db),

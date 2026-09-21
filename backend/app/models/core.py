@@ -157,35 +157,3 @@ class SavedSnippet(Base):
     description = Column(Text, nullable=True)
     sql_text = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-class DemoSession(Base):
-    """
-    Marks a user as an ephemeral demo account.
-
-    Deliberately a separate table rather than columns on `user`: that table is
-    owned by Better Auth, and there is no migration tool here — main.py calls
-    Base.metadata.create_all(), which creates new tables but never ALTERs
-    existing ones. A new table is picked up automatically on next boot.
-
-    Presence of a row IS the demo flag. Destructive routes are already closed
-    off by RBAC because demo users are created with role="viewer".
-    """
-    __tablename__ = "demo_sessions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Text, ForeignKey("user.id", ondelete="CASCADE"),
-                     unique=True, index=True, nullable=False)
-
-    questions_used = Column(Integer, default=0, nullable=False)
-    question_limit = Column(Integer, default=10, nullable=False)
-
-    expires_at = Column(DateTime, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    @property
-    def questions_remaining(self) -> int:
-        return max(0, (self.question_limit or 0) - (self.questions_used or 0))
-
-    @property
-    def is_expired(self) -> bool:
-        return self.expires_at is not None and self.expires_at < datetime.utcnow()

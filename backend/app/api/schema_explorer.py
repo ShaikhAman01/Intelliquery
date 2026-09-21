@@ -16,7 +16,7 @@ from app.core.logger import logger
 router = APIRouter()
 
 
-@router.get("/{connection_id}")
+@router.get("/{connection_id}", dependencies=[Depends(require_not_demo)])
 def get_full_schema(
     connection_id: int,
     db: Session = Depends(get_db),

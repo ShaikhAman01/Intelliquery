@@ -8,7 +8,7 @@ from typing import Optional
 
 from app.api.deps import get_db
 from app.models.core import QueryHistory, DbConnection, User
-from app.middleware.auth import get_current_user, require_viewer
+from app.middleware.auth import get_current_user, require_viewer, require_not_demo
 from app.core.logger import logger
 
 router = APIRouter()
@@ -89,7 +89,7 @@ def get_history_entry(
     }
 
 
-@router.delete("/{history_id}")
+@router.delete("/{history_id}", dependencies=[Depends(require_not_demo)])
 def delete_history_entry(
     history_id: int,
     db: Session = Depends(get_db),

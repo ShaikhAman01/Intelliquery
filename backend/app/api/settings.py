@@ -464,7 +464,7 @@ def get_my_invites(
     return {"invites": result}
 
 
-@router.post("/team/invites/{invite_id}/accept")
+@router.post("/team/invites/{invite_id}/accept", dependencies=[Depends(require_not_demo)])
 def accept_invite(
     invite_id: int,
     db: Session = Depends(get_db),
@@ -501,7 +501,7 @@ def accept_invite(
     }
 
 
-@router.post("/team/invites/{invite_id}/decline")
+@router.post("/team/invites/{invite_id}/decline", dependencies=[Depends(require_not_demo)])
 def decline_invite(
     invite_id: int,
     db: Session = Depends(get_db),
@@ -528,7 +528,7 @@ def decline_invite(
     return {"status": "success", "message": "Invitation declined."}
 
 
-@router.put("/team/role")
+@router.put("/team/role", dependencies=[Depends(require_not_demo)])
 def update_member_role(
     data: RoleUpdate,
     db: Session = Depends(get_db),

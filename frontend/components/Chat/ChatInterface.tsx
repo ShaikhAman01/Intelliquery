@@ -9,7 +9,6 @@ import {
   KeyboardEvent,
 } from 'react';
 import { useStore } from '@/lib/store';
-import { useDemoStatus, refreshDemoStatus } from '@/lib/use-demo';
 import { sendQuery, executeSQL, getSchema, createSampleConnection } from '@/lib/api';
 import { useToast } from '@/components/ui/toaster';
 import { ResultsTable } from '@/components/Chat/ResultsTable';
@@ -829,41 +828,6 @@ function WelcomeScreen({
   );
 }
 
-function DemoSuggestionChips({
-  questions,
-  onSelect,
-  disabled,
-  exhausted,
-}: {
-  questions: string[];
-  onSelect: (text: string) => void;
-  disabled: boolean;
-  exhausted: boolean;
-}) {
-  if (questions.length === 0) return null;
-
-  return (
-    <div className="mb-3">
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-content-3">
-        {exhausted ? 'Free to ask, already answered' : 'Try one of these'}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {questions.map((q) => (
-          <button
-            key={q}
-            onClick={() => onSelect(q)}
-            disabled={disabled}
-            className="rounded-full border border-border px-3 py-1.5 text-[12.5px] text-content-2 transition-colors hover:border-[var(--ds-border-moderate)] hover:bg-base-1 hover:text-content-1 disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ background: 'var(--ds-base-0)' }}
-          >
-            {q}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ── Main ChatInterface ─────────────────────────────────────── */
 
 interface RestoreSession {
@@ -884,9 +848,6 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete, pendingReplayCached, onReplayCachedConsumed, pendingRestore, onRestoreConsumed }: ChatInterfaceProps = {}) {
   const { connections, activeConnectionId, setActiveConnection, addConnection } = useStore();
-  const demo = useDemoStatus();
-  const isDemoRef = useRef(demo.is_demo);
-  useEffect(() => { isDemoRef.current = demo.is_demo; }, [demo.is_demo]);
   const { toast } = useToast();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -894,17 +855,6 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [connectionSelectorOpen, setConnectionSelectorOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>(FALLBACK_SUGGESTIONS);
-
-  // Demo accounts get the curated list instead of schema-derived guesses: it is
-  // written for the sample store and is already warm in the SQL cache, so those
-  // questions cost no tokens and keep working after the budget is spent.
-  const demoSuggestions = useMemo<Suggestion[] | null>(() => {
-    if (!demo.is_demo || !demo.suggested_questions?.length) return null;
-    const icons = [TrendingUp, Zap, AlertTriangle];
-    return demo.suggested_questions
-      .slice(0, 4)
-      .map((label, i) => ({ label, icon: icons[i % icons.length] }));
-  }, [demo.is_demo, demo.suggested_questions]);
   const [sampleLoading, setSampleLoading] = useState(false);
 
   /* One-click sample database — the zero-setup onboarding path */
@@ -1072,9 +1022,6 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
     } finally {
       setIsSubmitting(false);
       if (successSql !== undefined) onQueryComplete?.(query, successSql, activeConnectionId);
-      // The backend only charges the demo budget when an LLM was actually
-      // involved, so re-read it rather than decrementing optimistically.
-      if (isDemoRef.current) refreshDemoStatus();
     }
   }, [input, isSubmitting, activeConnectionId, toast, updateMessage, onQueryComplete]);
 
@@ -1204,7 +1151,7 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
                 onSelect={handleSuggestion}
                 hasConnection={hasConnection}
                 hasAnyConnection={hasAnyConnection}
-                suggestions={demoSuggestions ?? suggestions}
+                suggestions={suggestions}
                 onTrySample={handleTrySample}
                 sampleLoading={sampleLoading}
               />
@@ -1310,14 +1257,6 @@ export function ChatInterface({ pendingReplay, onReplayConsumed, onQueryComplete
             </div>
           )}
 
-          {demo.is_demo && messages.length > 0 && (
-            <DemoSuggestionChips
-              questions={demo.suggested_questions ?? []}
-              onSelect={handleSuggestion}
-              disabled={!activeConnectionId || isSubmitting}
-              exhausted={(demo.questions_remaining ?? 0) <= 0}
-            />
-          )}
 
           {/* Input box */}
           <div

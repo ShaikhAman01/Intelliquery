@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.models.core import DbConnection, QueryHistory, User
-from app.middleware.auth import get_current_user, require_viewer
+from app.middleware.auth import get_current_user, require_viewer, require_not_demo
 from app.pipeline.nlp_processor import NLPProcessor
 from app.pipeline.template_engine import DynamicSQLGenerator
 from app.pipeline.llm_fallback import LLMService
@@ -19,7 +19,6 @@ from app.pipeline.schema_mapper import SchemaMapper
 from app.pipeline.schema_selector import select_relevant_tables
 from app.executor.sql_runner import SQLRunner
 from app.core.cache import sql_cache, result_cache, make_sql_key, make_result_key
-from app.core import demo as demo_service
 from app.core.logger import logger
 
 router = APIRouter()
@@ -206,16 +205,6 @@ async def process_query(
     if not connection.cached_schema:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Schema map empty. Please re-sync connection catalog.")
 
-    # Demo accounts carry a question budget. It is spent only on LLM calls —
-    # cache and template-engine answers cost nothing, so they stay free even
-    # after the budget runs out.
-    demo_record = demo_service.get_demo_session(db, current_user)
-    if demo_record and demo_record.is_expired:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="This demo session has expired. Create a free account to keep going.",
-        )
-
     # ── 2. Schema selection + context building ────────────────────────────────
     # Filter to only the tables relevant to this query before sending to LLM.
     # The template engine always uses the full schema for table resolution;
@@ -254,15 +243,6 @@ async def process_query(
                     source = "DYNAMIC"
             except Exception as e:
                 logger.warn(f"Template engine bypassed: {str(e)}")
-
-        if not sql_query and demo_record and demo_record.questions_remaining <= 0:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=(
-                    f"You have used all {demo_record.question_limit} AI questions in this demo. "
-                    "The suggested questions still work — or create a free account for unlimited queries."
-                ),
-            )
 
         if not sql_query:
             logger.info("Routing to LLM fallback pipeline.")
@@ -382,12 +362,6 @@ async def process_query(
                 error_msg = raw_error
                 logger.error(f"Query execution failed: {raw_error}")
 
-    # Charge the demo budget only if an LLM was actually involved. Placed
-    # after the post-execution repair/recovery paths, which can reach for the
-    # LLM even when generation started from cache or the template engine.
-    if demo_record and source.startswith("LLM"):
-        demo_service.consume_question(db, demo_record)
-
     execution_time_ms = int((time.time() - start_time) * 1000)
 
     # ── 5. Log Execution Telemetry (Asynchronous Commit Guard) ────────────────
@@ -452,7 +426,7 @@ async def process_query(
     }
 
 
-@router.post("/execute", status_code=status.HTTP_200_OK)
+@router.post("/execute", status_code=status.HTTP_200_OK, dependencies=[Depends(require_not_demo)])
 async def execute_raw_sql(
     sql: str,
     connection_id: int,
@@ -495,7 +469,8 @@ async def execute_raw_sql(
     return {"data": data, "execution_time_ms": execution_time_ms}
 
 
-@router.post("/explain", status_code=status.HTTP_200_OK)
+@router.post("/explain", status_code=status.HTTP_200_OK,
+             dependencies=[Depends(require_not_demo)])
 async def explain_query(
     sql: str,
     user_question: str = "",
