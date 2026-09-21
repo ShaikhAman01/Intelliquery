@@ -12,6 +12,7 @@ from app.api import history
 from app.api import voice
 from app.api import schema_explorer
 from app.api import settings as settings_api
+from app.api import demo as demo_api
 from app.api import snippets as snippets_api
 from app.middleware.rate_limiter import RateLimiterMiddleware
 
@@ -200,6 +201,12 @@ app.include_router(
     snippets_api.router,
     prefix=f"{API_PREFIX}/snippets",
     tags=["Snippets"])
+
+app.include_router(
+    demo_api.router,
+    prefix=f"{API_PREFIX}/demo",
+    tags=["Demo"],
+)
 
 @app.get(f"{API_PREFIX}/health")
 def health_check():

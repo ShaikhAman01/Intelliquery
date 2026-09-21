@@ -51,7 +51,7 @@ export default function PrivacyPage() {
       <InfoSection title="4. AI processing">
         <p>
           To generate SQL and insights, your question and the included schema metadata are sent
-          to our AI providers &mdash; <strong className="text-content-1">OpenAI</strong>, with{' '}
+          to our AI providers: <strong className="text-content-1">OpenAI</strong>, with{' '}
           <strong className="text-content-1">Google Gemini</strong> as a fallback. Only the
           question and schema metadata leave our infrastructure. Query{' '}
           <em>results</em> are returned to you and used to render summaries and charts in your
@@ -68,7 +68,7 @@ export default function PrivacyPage() {
           Query history can be deleted item-by-item from the History view. Deleting a database
           connection removes its stored credentials and cached schema. To delete your account and
           everything attached to it, use{' '}
-          <strong className="text-content-1">Settings &rarr; Delete account</strong> &mdash; it
+          <strong className="text-content-1">Settings &rarr; Delete account</strong>. It
           takes effect immediately, no request needed. If you would rather it be handled for you,
           email the address below.
         </p>

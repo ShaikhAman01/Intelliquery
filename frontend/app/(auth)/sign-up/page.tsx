@@ -5,7 +5,7 @@ import { Database, Zap, Users, Lock } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Create an account — Intelliquery',
+  title: 'Create an account · Intelliquery',
   description: 'Create an Intelliquery account and connect your first database.',
   robots: { index: false, follow: false },
 };

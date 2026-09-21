@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/Providers/ThemeProvider";
 import { ToastProvider } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { VerifyEmailBanner } from "@/components/Layout/VerifyEmailBanner";
+import { DemoBanner } from "@/components/Layout/DemoBanner";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
@@ -47,6 +48,7 @@ export default function RootLayout({
           <TooltipProvider delayDuration={400}>
             <ToastProvider>
               <div className="flex h-[100dvh] flex-col">
+                <DemoBanner />
                 <VerifyEmailBanner />
                 <div className="min-h-0 flex-1 overflow-y-auto">
                   {children}

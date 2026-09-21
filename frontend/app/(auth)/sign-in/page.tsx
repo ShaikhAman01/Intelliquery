@@ -5,7 +5,7 @@ import { Database, MessageSquare, BarChart3, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Sign in — Intelliquery',
+  title: 'Sign in · Intelliquery',
   description: 'Sign in to Intelliquery to query your connected databases in plain English.',
   robots: { index: false, follow: false },
 };

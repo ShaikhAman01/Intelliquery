@@ -4,18 +4,23 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AlertTriangle, X, Loader2 } from 'lucide-react';
 import { useSession } from '@/lib/use-auth';
+import { useDemoStatus } from '@/lib/use-demo';
 import { authClient } from '@/lib/auth-client';
 
 const HIDDEN_ROUTES = ['/sign-in', '/sign-up', '/verify-email', '/forgot-password', '/reset-password'];
 
 export function VerifyEmailBanner() {
   const { user, isLoading } = useSession();
+  const demo = useDemoStatus();
   const pathname = usePathname();
   const [dismissed, setDismissed] = useState(false);
   const [resending, setResending] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   if (isLoading || dismissed || !user || user.emailVerified) return null;
+  // Demo accounts are intentionally unverified and their address cannot receive
+  // mail, so prompting them to verify is noise they can never act on.
+  if (demo.is_demo) return null;
   if (HIDDEN_ROUTES.some((r) => pathname?.startsWith(r))) return null;
 
   const resend = async () => {

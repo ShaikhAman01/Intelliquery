@@ -19,6 +19,7 @@ from app.pipeline.schema_mapper import SchemaMapper
 from app.pipeline.schema_selector import select_relevant_tables
 from app.executor.sql_runner import SQLRunner
 from app.core.cache import sql_cache, result_cache, make_sql_key, make_result_key
+from app.core import demo as demo_service
 from app.core.logger import logger
 
 router = APIRouter()
@@ -205,6 +206,16 @@ async def process_query(
     if not connection.cached_schema:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Schema map empty. Please re-sync connection catalog.")
 
+    # Demo accounts carry a question budget. It is spent only on LLM calls —
+    # cache and template-engine answers cost nothing, so they stay free even
+    # after the budget runs out.
+    demo_record = demo_service.get_demo_session(db, current_user)
+    if demo_record and demo_record.is_expired:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This demo session has expired. Create a free account to keep going.",
+        )
+
     # ── 2. Schema selection + context building ────────────────────────────────
     # Filter to only the tables relevant to this query before sending to LLM.
     # The template engine always uses the full schema for table resolution;
@@ -244,6 +255,15 @@ async def process_query(
             except Exception as e:
                 logger.warn(f"Template engine bypassed: {str(e)}")
 
+        if not sql_query and demo_record and demo_record.questions_remaining <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"You have used all {demo_record.question_limit} AI questions in this demo. "
+                    "The suggested questions still work — or create a free account for unlimited queries."
+                ),
+            )
+
         if not sql_query:
             logger.info("Routing to LLM fallback pipeline.")
             conversation_history = _get_conversation_context(db, current_user.id, connection_id)
@@ -266,6 +286,7 @@ async def process_query(
 
     if not sql_query:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Could not parse an executable SQL statement.")
+
 
     # ── 4a. Pre-execution table validation (LLM output only) ─────────────────
     # SQL_CACHE entries were validated before they were stored — skip re-check.
@@ -360,6 +381,12 @@ async def process_query(
                 execution_status = "ERROR"
                 error_msg = raw_error
                 logger.error(f"Query execution failed: {raw_error}")
+
+    # Charge the demo budget only if an LLM was actually involved. Placed
+    # after the post-execution repair/recovery paths, which can reach for the
+    # LLM even when generation started from cache or the template engine.
+    if demo_record and source.startswith("LLM"):
+        demo_service.consume_question(db, demo_record)
 
     execution_time_ms = int((time.time() - start_time) * 1000)
 

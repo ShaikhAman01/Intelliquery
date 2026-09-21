@@ -9,7 +9,7 @@ from typing import Optional
 
 from app.api.deps import get_db
 from app.models.core import DbConnection, User
-from app.middleware.auth import get_current_user, require_viewer
+from app.middleware.auth import get_current_user, require_viewer, require_not_demo
 from app.pipeline.schema_mapper import SchemaMapper
 from app.core.logger import logger
 
@@ -45,7 +45,7 @@ def get_full_schema(
     return {"tables": connection.cached_schema}
 
 
-@router.post("/{connection_id}/refresh")
+@router.post("/{connection_id}/refresh", dependencies=[Depends(require_not_demo)])
 def refresh_schema(
     connection_id: int,
     db: Session = Depends(get_db),

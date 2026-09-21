@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from app.api.deps import get_db
 from app.models.core import SavedSnippet, User, DbConnection
-from app.middleware.auth import get_current_user
+from app.middleware.auth import get_current_user, require_not_demo
 
 router = APIRouter()
 
@@ -19,7 +19,7 @@ class SnippetCreate(BaseModel):
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
-@router.post("/")
+@router.post("/", dependencies=[Depends(require_not_demo)])
 def create_snippet(
     data: SnippetCreate, 
     db: Session = Depends(get_db), 

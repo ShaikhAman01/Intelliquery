@@ -5,7 +5,7 @@ import { Database, ShieldCheck, Lock, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Choose a new password — Intelliquery',
+  title: 'Choose a new password · Intelliquery',
   description: 'Set a new password for your Intelliquery account.',
   robots: { index: false, follow: false },
 };

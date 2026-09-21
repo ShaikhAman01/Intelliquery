@@ -5,7 +5,7 @@ import { Database, MailCheck, ShieldCheck, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Verify your email — Intelliquery',
+  title: 'Verify your email · Intelliquery',
   description: 'Confirm your email address to finish setting up Intelliquery.',
   robots: { index: false, follow: false },
 };

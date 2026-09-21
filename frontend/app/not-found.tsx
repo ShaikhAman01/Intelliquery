@@ -4,7 +4,7 @@ import { Database, ArrowLeft, BookOpen, Bug } from "lucide-react";
 import { BUG_REPORT_URL } from "@/lib/links";
 
 export const metadata: Metadata = {
-  title: "Page not found — Intelliquery",
+  title: "Page not found · Intelliquery",
   description: "That page does not exist.",
   robots: { index: false, follow: false },
 };

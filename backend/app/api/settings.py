@@ -13,7 +13,7 @@ from datetime import datetime
 
 from app.api.deps import get_db
 from app.models.core import User, Organization, OrgInvite, DbConnection, QueryHistory, SavedSnippet
-from app.middleware.auth import get_current_user, require_viewer, require_admin, require_owner, require_verified_admin, require_verified_user
+from app.middleware.auth import get_current_user, require_viewer, require_admin, require_owner, require_verified_admin, require_verified_user, require_not_demo
 from app.core.config import settings
 from app.core.emailer import send_email, team_invite_email
 from app.core.logger import logger
@@ -70,7 +70,7 @@ def get_profile(current_user: User = Depends(get_current_user)):
     }
 
 
-@router.put("/profile")
+@router.put("/profile", dependencies=[Depends(require_not_demo)])
 def update_profile(
     data: ProfileUpdate,
     db: Session = Depends(get_db),
@@ -89,7 +89,7 @@ def update_profile(
 
 # ── Organization ─────────────────────────────────────────────────────────────
 
-@router.post("/organization")
+@router.post("/organization", dependencies=[Depends(require_not_demo)])
 def create_organization(
     data: OrgCreate,
     db: Session = Depends(get_db),
@@ -155,7 +155,7 @@ def get_organization(
     }
 
 
-@router.put("/organization")
+@router.put("/organization", dependencies=[Depends(require_not_demo)])
 def update_organization(
     data: OrgUpdate,
     db: Session = Depends(get_db),
@@ -198,7 +198,7 @@ def update_organization(
     }
 
 
-@router.delete("/organization")
+@router.delete("/organization", dependencies=[Depends(require_not_demo)])
 def delete_organization(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_owner),
@@ -260,7 +260,7 @@ def list_team_members(
     }
 
 
-@router.post("/team/invite")
+@router.post("/team/invite", dependencies=[Depends(require_not_demo)])
 def invite_team_member(
     data: TeamInvite,
     db: Session = Depends(get_db),
@@ -325,7 +325,7 @@ def invite_team_member(
     }
 
 
-@router.post("/team/invite-link")
+@router.post("/team/invite-link", dependencies=[Depends(require_not_demo)])
 def create_invite_link(
     data: InviteLink,
     db: Session = Depends(get_db),
@@ -384,15 +384,12 @@ def get_invite_info(
             "email": invite.invitee_email,  # None for shareable links
         }
 
-    # Legacy links used the raw org slug
-    org = db.query(Organization).filter(Organization.slug == token).first()
-    if org:
-        return {"kind": "org_link", "org_name": org.name, "inviter_name": None, "role": "viewer", "email": None}
-
+    # No slug fallback here either: it confirmed an organization's existence
+    # and leaked its name to anyone guessing slugs.
     raise HTTPException(status_code=404, detail="This invitation link is invalid or has expired.")
 
 
-@router.post("/team/invite/{token}/accept")
+@router.post("/team/invite/{token}/accept", dependencies=[Depends(require_not_demo)])
 def accept_invite_by_token(
     token: str,
     db: Session = Depends(get_db),
@@ -408,15 +405,10 @@ def accept_invite_by_token(
     ).first()
 
     if not invite:
-        # Legacy org-slug links keep working
-        org = db.query(Organization).filter(Organization.slug == token).first()
-        if not org:
-            raise HTTPException(status_code=404, detail="This invitation link is invalid or has expired.")
-        current_user.org_id = org.id
-        current_user.role = "viewer"
-        db.commit()
-        logger.info(f"User {current_user.email} joined org {org.id} via legacy slug link")
-        return {"status": "success", "message": f"You've joined {org.name} as viewer."}
+        # No slug fallback. Org slugs are derived from the org name, so treating
+        # one as an invite token let anyone join by guessing the company name.
+        # Real shareable links carry secrets.token_urlsafe(24).
+        raise HTTPException(status_code=404, detail="This invitation link is invalid or has expired.")
 
     if invite.invitee_email and invite.invitee_email != (current_user.email or "").lower():
         raise HTTPException(

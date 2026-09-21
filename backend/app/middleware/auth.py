@@ -172,6 +172,39 @@ def require_verified_role(min_role: str):
     return _check_verified
 
 
+# ── Demo accounts ────────────────────────────────────────────────────────────
+
+def require_not_demo(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Reject demo accounts outright.
+
+    Applied to every route that changes state beyond the caller's own throwaway
+    sandbox. This is deliberately an explicit check rather than a role level:
+    relying on the role ladder alone is what let a demo account reach
+    create_organization and promote itself to owner.
+
+    One indexed lookup on demo_sessions.user_id, and only on mutating routes,
+    so it stays off the query hot path.
+    """
+    from app.models.core import DemoSession
+
+    is_demo = (
+        db.query(DemoSession.id)
+        .filter(DemoSession.user_id == current_user.id)
+        .first()
+        is not None
+    )
+    if is_demo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This action is not available in the demo. Create a free account to use it.",
+        )
+    return current_user
+
+
 # ── Convenience shortcuts ────────────────────────────────────────────────────
 
 require_viewer = require_role("viewer")

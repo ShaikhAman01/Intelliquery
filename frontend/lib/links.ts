@@ -6,5 +6,5 @@ export const BUG_REPORT_URL = `${REPO_URL}/issues/new?template=bug_report.yml`;
 
 export const FEATURE_REQUEST_URL = `${REPO_URL}/issues/new?template=feature_request.yml`;
 
-/** Operational inbox — kept separate from the personal address on the portfolio. */
+/** Operational inbox, kept separate from the personal address on the portfolio. */
 export const CONTACT_EMAIL = "shaikhaman.0020@gmail.com";

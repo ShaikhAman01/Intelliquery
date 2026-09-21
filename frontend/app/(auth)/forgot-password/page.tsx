@@ -5,7 +5,7 @@ import { Database, ShieldCheck, Lock, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Reset your password — Intelliquery',
+  title: 'Reset your password · Intelliquery',
   description: 'Request a password reset link for your Intelliquery account.',
   robots: { index: false, follow: false },
 };

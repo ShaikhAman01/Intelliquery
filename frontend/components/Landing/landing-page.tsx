@@ -11,9 +11,14 @@ import {
   Play,
   Copy,
   CheckCircle2,
+  BookOpen,
+  Plug,
+  Lock,
+  TableProperties,
 } from 'lucide-react';
 import Link from 'next/link';
 import { BUG_REPORT_URL, FEATURE_REQUEST_URL } from '@/lib/links';
+import { DemoButton } from './demo-button';
 
 const FEATURES = [
   {
@@ -35,6 +40,29 @@ const FEATURES = [
 
 // `soon: true` engines are visible in the connection wizard but not yet connectable —
 // keep this list in sync with DB_TYPES in app/connections/new/page.tsx
+// Mirrors the section headings on /docs so the landing page and the docs
+// never drift apart.
+const DOC_LINKS = [
+  {
+    Icon: Plug,
+    title: 'Connecting your database',
+    description:
+      'Point Intelliquery at PostgreSQL, MySQL, SQLite, SQL Server, MariaDB or CockroachDB. Pick the tables it may see.',
+  },
+  {
+    Icon: Lock,
+    title: 'Security model',
+    description:
+      'Every query is SELECT-only, runs inside a transaction that is always rolled back, and passes a validator first.',
+  },
+  {
+    Icon: TableProperties,
+    title: 'Working with results',
+    description:
+      'Read the generated SQL, sort and export the table, or let the AI summarise what the numbers actually say.',
+  },
+];
+
 const DB_TYPES = [
   { name: 'PostgreSQL' },
   { name: 'MySQL' },
@@ -79,6 +107,12 @@ export function LandingPage() {
         </div>
 
         <div className="flex items-center gap-4">
+          <Link
+            href="/docs"
+            className="hidden text-[13px] font-medium text-content-3 hover:text-content-1 transition-colors sm:block"
+          >
+            Docs
+          </Link>
           <Link
             href="/sign-in"
             className="text-[13px] font-medium text-content-3 hover:text-content-1 transition-colors"
@@ -133,14 +167,17 @@ export function LandingPage() {
               Start for free
               <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
             </Link>
-            <Link
-              href="/sign-in"
-              className="inline-flex items-center justify-center rounded-xl border border-border px-6 py-3 text-[14px] font-semibold text-content-2 transition-colors hover:bg-base-2 hover:text-content-1"
-              style={{ background: 'var(--ds-base-1)' }}
-            >
-              Sign in to your account
-            </Link>
+            <DemoButton />
           </motion.div>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.15 }}
+            className="mt-3 text-[13px] text-content-3"
+          >
+            The demo opens a sandbox with a sample store database. No signup, no card.
+          </motion.p>
 
           {/* DB compatibility strip */}
           <motion.div
@@ -358,6 +395,60 @@ export function LandingPage() {
               <p className="mt-2 text-[13px] leading-relaxed text-content-3">{description}</p>
             </motion.div>
           ))}
+        </section>
+
+        {/* ── How it works ── */}
+        <section className="mt-24">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <h2 className="text-[26px] font-bold tracking-tight text-content-1">
+                How it works
+              </h2>
+              <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-content-3">
+                The short version: you connect a database, choose what it may read, and ask
+                questions. The longer version is in the docs.
+              </p>
+            </div>
+            <Link
+              href="/docs"
+              className="group inline-flex flex-shrink-0 items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-[13px] font-semibold text-content-2 transition-colors hover:text-content-1"
+              style={{ background: 'var(--ds-base-1)' }}
+            >
+              <BookOpen className="h-4 w-4" />
+              Read the docs
+              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            {DOC_LINKS.map(({ Icon, title, description }, i) => (
+              <motion.div
+                key={title}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.35, delay: i * 0.06 }}
+              >
+                <Link
+                  href="/docs"
+                  className="group flex h-full flex-col rounded-2xl border border-border p-6 transition-colors duration-150 hover:bg-base-1"
+                  style={{ background: 'var(--ds-base-0)', boxShadow: 'var(--ds-shadow-sm)' }}
+                >
+                  <div
+                    className="mb-4 h-10 w-10 rounded-xl flex items-center justify-center"
+                    style={{ background: 'rgba(37,99,235,0.10)' }}
+                  >
+                    <Icon className="h-5 w-5 text-brand" />
+                  </div>
+                  <h3 className="flex items-center gap-1.5 text-[15px] font-semibold text-content-1">
+                    {title}
+                    <ArrowRight className="h-3.5 w-3.5 opacity-0 transition-all duration-150 group-hover:translate-x-0.5 group-hover:opacity-60" />
+                  </h3>
+                  <p className="mt-2 text-[13px] leading-relaxed text-content-3">{description}</p>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
         </section>
 
         {/* ── CTA banner ── */}
