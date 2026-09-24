@@ -12,6 +12,7 @@ from app.pipeline.schema_mapper import SchemaMapper
 from app.core.client_db_manager import ClientDBManager
 from app.core.cache import sql_cache
 from app.core.logger import logger
+from app.core.net_guard import BlockedTarget, assert_target_allowed
 
 router = APIRouter()
 mapper = SchemaMapper()
@@ -58,6 +59,11 @@ def test_connection(
     Returns {status, schema: {table: {col: {type, nullable, is_pk, fk_target}}}}.
     """
     try:
+        assert_target_allowed(conn_data.db_type, conn_data.host)
+    except BlockedTarget as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    try:
         from sqlalchemy import create_engine, text, inspect as sa_inspect
 
         db_url = _build_db_url(
@@ -95,8 +101,13 @@ def test_connection(
         return {"status": "success", "schema": schema_snapshot}
 
     except Exception as e:
-        logger.error(f"Connection test failed: {e}")
-        raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
+        # Driver text is logged, never returned: the differences between
+        # "refused", "timed out" and "bad SSL" turn this into a port scanner.
+        logger.error(f"Connection test failed for {conn_data.host}: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="Could not connect with those details. Check the host, port and credentials.",
+        )
 
 
 @router.post("/{connection_id}/test", dependencies=[Depends(require_not_demo)])
@@ -137,6 +148,11 @@ def create_connection(
     2. Connects to the user's DB to fetch schema.
     3. Saves connection info + schema snapshot to our internal DB.
     """
+    try:
+        assert_target_allowed(conn_data.db_type, conn_data.host)
+    except BlockedTarget as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     try:
         encrypted_pw = encrypt_password(conn_data.password)
 

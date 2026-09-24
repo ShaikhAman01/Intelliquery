@@ -489,8 +489,21 @@ export function LandingPage() {
         </motion.div>
       </main>
 
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden"
+        style={{ background: 'color-mix(in srgb, var(--ds-base-1) 92%, transparent)' }}
+      >
+        <Link
+          href="/sign-up"
+          className="flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-[15px] font-semibold text-white"
+          style={{ background: 'var(--ds-accent)' }}
+        >
+          Get started free
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+
       {/* ── Footer ── */}
-      <footer className="border-t border-border" style={{ background: 'var(--ds-base-1)' }}>
+      <footer className="border-t border-border pb-20 sm:pb-0" style={{ background: 'var(--ds-base-1)' }}>
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-6 text-[12px] text-content-3 sm:flex-row">
           <div className="flex items-center gap-2">
             <div

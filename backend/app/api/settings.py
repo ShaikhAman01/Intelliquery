@@ -416,6 +416,12 @@ def accept_invite_by_token(
             detail=f"This invitation was sent to {invite.invitee_email}. Sign in with that email to accept it.",
         )
 
+    if invite.invitee_email and not current_user.emailVerified:
+        raise HTTPException(
+            status_code=403,
+            detail="Verify your email address before accepting this invitation.",
+        )
+
     current_user.org_id = invite.org_id
     current_user.role = invite.role
     if invite.invitee_email:
@@ -432,6 +438,20 @@ def accept_invite_by_token(
     }
 
 
+
+def _claimable_email(user: User) -> str | None:
+    """
+    The address this user may claim email invites for.
+
+    None until the address is verified, so registering someone else's invited
+    address does not hand over their role. Comparing a column to None yields
+    IS NULL, which never matches a real invite.
+    """
+    if not user.emailVerified:
+        return None
+    return (user.email or "").strip().lower() or None
+
+
 @router.get("/team/invites")
 def get_my_invites(
     db: Session = Depends(get_db),
@@ -442,7 +462,7 @@ def get_my_invites(
     invites = db.query(OrgInvite).filter(
         or_(
             OrgInvite.invitee_id == current_user.id,
-            OrgInvite.invitee_email == (current_user.email or "").lower(),
+            OrgInvite.invitee_email == _claimable_email(current_user),
         ),
         OrgInvite.status == "pending",
     ).all()
@@ -475,7 +495,7 @@ def accept_invite(
         OrgInvite.id == invite_id,
         or_(
             OrgInvite.invitee_id == current_user.id,
-            OrgInvite.invitee_email == (current_user.email or "").lower(),
+            OrgInvite.invitee_email == _claimable_email(current_user),
         ),
         OrgInvite.status == "pending",
     ).first()
@@ -512,7 +532,7 @@ def decline_invite(
         OrgInvite.id == invite_id,
         or_(
             OrgInvite.invitee_id == current_user.id,
-            OrgInvite.invitee_email == (current_user.email or "").lower(),
+            OrgInvite.invitee_email == _claimable_email(current_user),
         ),
         OrgInvite.status == "pending",
     ).first()
