@@ -127,7 +127,7 @@ export function LandingPage() {
       </header>
 
       {/* ── Hero ── */}
-      <main className="relative z-10 mx-auto max-w-6xl px-6 pt-16 pb-24">
+      <main id="main-content" tabIndex={-1} className="outline-none relative z-10 mx-auto max-w-6xl px-6 pt-16 pb-24">
         <div className="flex flex-col items-center text-center">
 
           <motion.h1
@@ -313,20 +313,20 @@ export function LandingPage() {
                         <Copy className="h-3 w-3 text-content-3" />
                       </div>
                       <div className="px-4 py-3 leading-relaxed text-content-2 select-none">
-                        <span style={{ color: 'var(--ds-accent)' }}>SELECT</span>{' '}
+                        <span style={{ color: 'var(--ds-accent-text)' }}>SELECT</span>{' '}
                         category,{' '}
-                        <span style={{ color: 'var(--ds-accent)' }}>SUM</span>(revenue){' '}
-                        <span style={{ color: 'var(--ds-accent)' }}>AS</span>{' '}total_revenue
+                        <span style={{ color: 'var(--ds-accent-text)' }}>SUM</span>(revenue){' '}
+                        <span style={{ color: 'var(--ds-accent-text)' }}>AS</span>{' '}total_revenue
                         <br />
-                        <span style={{ color: 'var(--ds-accent)' }}>FROM</span> orders
+                        <span style={{ color: 'var(--ds-accent-text)' }}>FROM</span> orders
                         <br />
-                        <span style={{ color: 'var(--ds-accent)' }}>WHERE</span>{' '}
+                        <span style={{ color: 'var(--ds-accent-text)' }}>WHERE</span>{' '}
                         order_date {'>='} &apos;2025-01-01&apos;
                         <br />
-                        <span style={{ color: 'var(--ds-accent)' }}>GROUP BY</span> category
+                        <span style={{ color: 'var(--ds-accent-text)' }}>GROUP BY</span> category
                         <br />
-                        <span style={{ color: 'var(--ds-accent)' }}>ORDER BY</span> total_revenue{' '}
-                        <span style={{ color: 'var(--ds-accent)' }}>DESC</span>;
+                        <span style={{ color: 'var(--ds-accent-text)' }}>ORDER BY</span> total_revenue{' '}
+                        <span style={{ color: 'var(--ds-accent-text)' }}>DESC</span>;
                       </div>
                     </div>
                     {/* Action buttons */}

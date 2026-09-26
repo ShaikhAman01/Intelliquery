@@ -49,6 +49,9 @@ class ClientDBManager:
             f"({connection_model.host})"
         )
 
+        from app.core.net_guard import assert_connection_allowed
+        assert_connection_allowed(connection_model)
+
         real_password = decrypt_password(connection_model.encrypted_password)
         db_url = cls._build_url(connection_model, real_password)
 

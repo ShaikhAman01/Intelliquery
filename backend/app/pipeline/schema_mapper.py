@@ -95,6 +95,9 @@ class SchemaMapper:
         The sample values are stored in the schema so the LLM can generate
         accurate WHERE clauses without guessing valid enum values.
         """
+        from app.core.net_guard import assert_connection_allowed
+        assert_connection_allowed(connection_model)
+
         db_url = self._build_url(connection_model)
         # SQLite's driver rejects connect_timeout; it's a network-DB option
         connect_args = {} if connection_model.db_type == "sqlite" else {"connect_timeout": 10}

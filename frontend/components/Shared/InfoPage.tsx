@@ -40,7 +40,7 @@ export function InfoPage({
       </header>
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto">
+      <main id="main-content" tabIndex={-1} className="outline-none flex-1 overflow-y-auto">
         <div className="max-w-[760px] mx-auto px-6 py-12">
           <h1 className="text-[28px] font-bold tracking-tight text-content-1">{title}</h1>
           {subtitle && <p className="mt-2 text-[14px] text-content-3">{subtitle}</p>}

@@ -24,6 +24,7 @@ def _is_blocked_ip(ip: ipaddress._BaseAddress) -> bool:
         or ip.is_reserved
         or ip.is_multicast
         or ip.is_unspecified
+        or not ip.is_global
     )
 
 
@@ -73,3 +74,14 @@ def assert_host_allowed(host: str) -> None:
 def assert_target_allowed(db_type: str, host: str) -> None:
     assert_db_type_allowed(db_type)
     assert_host_allowed(host)
+
+
+def assert_connection_allowed(connection_model) -> None:
+    """Re-check a saved connection before dialling it. sqlite is allowed only
+    for the built-in sample; DNS may have changed since the row was saved."""
+    if (connection_model.db_type or "").lower() == "sqlite":
+        from app.core.sample_db import SAMPLE_DB_PATH
+        if connection_model.db_name != str(SAMPLE_DB_PATH):
+            raise BlockedTarget("That database is not allowed.")
+        return
+    assert_target_allowed(connection_model.db_type, connection_model.host)

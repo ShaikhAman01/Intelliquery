@@ -37,7 +37,7 @@ export default function ResetPasswordPage() {
             <h2 className="text-[34px] font-bold text-white leading-[1.2] tracking-tight">
               Set a new<br />password
             </h2>
-            <p className="mt-4 text-[15px] text-white/70 leading-relaxed">
+            <p className="mt-4 text-[15px] text-white/95 leading-relaxed">
               Choose a strong password to keep your account secure.
             </p>
           </div>
@@ -48,13 +48,13 @@ export default function ResetPasswordPage() {
                 <div className="h-7 w-7 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0 border border-white/20">
                   <Icon className="h-3.5 w-3.5 text-white" />
                 </div>
-                <span className="text-[13px] text-white/80 leading-snug">{text}</span>
+                <span className="text-[13px] text-white/95 leading-snug">{text}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-[12px] text-white/30">© {new Date().getFullYear()} Intelliquery · All rights reserved</p>
+        <p className="text-[12px] text-white/95">© {new Date().getFullYear()} Intelliquery · All rights reserved</p>
       </div>
 
       {/* ── Right: form panel ── */}

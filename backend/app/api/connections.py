@@ -12,7 +12,7 @@ from app.pipeline.schema_mapper import SchemaMapper
 from app.core.client_db_manager import ClientDBManager
 from app.core.cache import sql_cache
 from app.core.logger import logger
-from app.core.net_guard import BlockedTarget, assert_target_allowed
+from app.core.net_guard import BlockedTarget, assert_connection_allowed, assert_target_allowed
 
 router = APIRouter()
 mapper = SchemaMapper()
@@ -123,6 +123,10 @@ def test_saved_connection(
     if conn.user_id != current_user.id:
         if not conn.org_id or conn.org_id != current_user.org_id:
             raise HTTPException(status_code=403, detail="Access denied.")
+    try:
+        assert_connection_allowed(conn)
+    except BlockedTarget as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     try:
         from sqlalchemy import create_engine, text
         password = decrypt_password(conn.encrypted_password)

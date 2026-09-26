@@ -112,7 +112,7 @@
   /* ── Text hierarchy ──────────────────────────────────────────*/
   --ds-text-1:    #0f172a;
   --ds-text-2:    #3d4966;
-  --ds-text-3:    #8a95a8;
+  --ds-text-3:    #5a6479;
   --ds-text-code: #1e293b;
 
   /* ── Brand accent ─────────────────────────────────────────── */
@@ -120,6 +120,7 @@
   --ds-accent-hover:  #1d4ed8;
   --ds-accent-muted:  rgba(37, 99, 235, 0.08);
   --ds-accent-subtle: rgba(37, 99, 235, 0.04);
+  --ds-accent-text:   var(--ds-accent);
 
   /* ── Semantic ─────────────────────────────────────────────── */
   --ds-success:        #15803d;
@@ -231,7 +232,7 @@
   /* ── Text ─────────────────────────────────────────────────── */
   --ds-text-1:    #ededef;
   --ds-text-2:    #9494a0;
-  --ds-text-3:    #5e5e6a;
+  --ds-text-3:    #86868f;
   --ds-text-code: #e4e4e7;
 
   /* ── Brand accent ─────────────────────────────────────────── */
@@ -239,6 +240,7 @@
   --ds-accent-hover:  #3b82f6;
   --ds-accent-muted:  rgba(37, 99, 235, 0.12);
   --ds-accent-subtle: rgba(37, 99, 235, 0.06);
+  --ds-accent-text:   var(--ds-accent-hover);
 
   /* ── Semantic ─────────────────────────────────────────────── */
   --ds-success:        #22c55e;
@@ -502,3 +504,7 @@
 .custom-scrollbar::-webkit-scrollbar-track  { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb  { background: var(--ds-base-4); border-radius: var(--ds-radius-full); }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--ds-base-5); }
+
+/* --ds-accent is also the white-text button fill, so darkening links in
+   dark mode has to happen here rather than on the token. */
+.dark .text-brand { color: var(--ds-accent-text); }

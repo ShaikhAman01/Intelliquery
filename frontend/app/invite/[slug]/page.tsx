@@ -81,7 +81,7 @@ export default function InviteLandingPage({ params }: { params: Promise<{ slug: 
             <h2 className="text-[34px] font-bold text-white leading-[1.2] tracking-tight">
               Better together
             </h2>
-            <p className="mt-4 text-[15px] text-white/70 leading-relaxed">
+            <p className="mt-4 text-[15px] text-white/95 leading-relaxed">
               Join your team and start exploring your data — no SQL required.
             </p>
           </div>
@@ -92,13 +92,13 @@ export default function InviteLandingPage({ params }: { params: Promise<{ slug: 
                 <div className="h-7 w-7 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0 border border-white/20">
                   <Icon className="h-3.5 w-3.5 text-white" />
                 </div>
-                <span className="text-[13px] text-white/80 leading-snug">{text}</span>
+                <span className="text-[13px] text-white/95 leading-snug">{text}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-[12px] text-white/30">© {new Date().getFullYear()} Intelliquery · All rights reserved</p>
+        <p className="text-[12px] text-white/95">© {new Date().getFullYear()} Intelliquery · All rights reserved</p>
       </div>
 
       {/* ── Right: content panel ── */}

@@ -147,7 +147,7 @@ function SettingsContent() {
         </div>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar px-6 py-8 sm:px-10 sm:pt-8">
+        <main id="main-content" tabIndex={-1} className="outline-none flex-1 overflow-y-auto custom-scrollbar px-6 py-8 sm:px-10 sm:pt-8">
           <div className="max-w-3xl mx-auto space-y-6">
 
             {activeTab === 'profile'      && <ProfileTab user={user} />}

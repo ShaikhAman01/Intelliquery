@@ -32,7 +32,7 @@ export default function NotFound() {
         </Link>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-6 py-16">
+      <main id="main-content" tabIndex={-1} className="outline-none flex-1 flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-[520px] text-center">
           <p className="text-[13px] font-mono font-medium tracking-wide text-content-3">
             404
