@@ -130,6 +130,7 @@ class SQLRunner:
                         conn.execute(text("SET TRANSACTION READ ONLY;"))
                     elif db_type in ("mysql", "mariadb"):
                         conn.execute(text(f"SET SESSION MAX_EXECUTION_TIME = {self.DEFAULT_TIMEOUT_MS};"))
+                        conn.execute(text("SET TRANSACTION READ ONLY;"))
 
                     if use_savepoint:
                         conn.execute(text("SAVEPOINT intelliquery_safe;"))
