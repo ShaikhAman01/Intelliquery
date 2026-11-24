@@ -5,7 +5,8 @@ Limits requests per IP address using a sliding window approach.
 
 import time
 from collections import defaultdict
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.logger import logger
@@ -38,9 +39,11 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
         if len(self._requests[client_ip]) >= self.requests_per_minute:
             logger.warning(f"🚦 Rate limit exceeded for {client_ip}")
-            raise HTTPException(
+            retry_after = int(self._requests[client_ip][0] + self.window_seconds - now) + 1
+            return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many requests. Please try again later.",
+                content={"detail": "Too many requests. Please try again later."},
+                headers={"Retry-After": str(retry_after)},
             )
 
         self._requests[client_ip].append(now)

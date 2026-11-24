@@ -10,7 +10,7 @@ from app.middleware.auth import get_current_user, require_viewer, require_editor
 from app.core.security import encrypt_password, decrypt_password
 from app.pipeline.schema_mapper import SchemaMapper
 from app.core.client_db_manager import ClientDBManager
-from app.core.cache import sql_cache
+from app.core.cache import sql_cache, result_cache
 from app.core.logger import logger
 from app.core.net_guard import BlockedTarget, assert_connection_allowed, assert_target_allowed
 
@@ -315,9 +315,10 @@ def refresh_connection_schema(
         db.commit()
         db.refresh(connection)
 
-        # Invalidate SQL cache for this connection so stale queries
-        # generated against the old schema are never replayed.
+        # Invalidate both caches for this connection so nothing from
+        # the old schema is ever replayed.
         evicted = sql_cache.invalidate_connection(connection_id)
+        result_cache.invalidate_connection(connection_id)
         if evicted:
             logger.info(f"SQL cache: evicted {evicted} entries for connection {connection_id} after schema refresh.")
 

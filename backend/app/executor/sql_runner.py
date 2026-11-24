@@ -10,7 +10,14 @@ class SQLRunner:
     DEFAULT_MAX_ROWS = 100
     DEFAULT_TIMEOUT_MS = 15000 
 
-    def validate_query(self, sql: str):
+    # T-SQL runs several statements in one batch without a ";" between them
+    MSSQL_FORBIDDEN = [
+        r"\bEXECUTE\b", r"\bMERGE\b", r"\bCOMMIT\b", r"\bROLLBACK\b", r"\bBULK\b",
+        r"\bDENY\b", r"\bREVOKE\b", r"\bBACKUP\b", r"\bRESTORE\b", r"\bSHUTDOWN\b",
+        r"\bDBCC\b", r"\bKILL\b", r"\bWRITETEXT\b", r"\bUPDATETEXT\b", r"\bRECONFIGURE\b",
+    ]
+
+    def validate_query(self, sql: str, db_type: str | None = None):
        
         logger.info(f"Validating SQL: {sql}")
 
@@ -25,6 +32,17 @@ class SQLRunner:
             r'^(?:SQL|Query|Answer|Here\s+is\s+(?:the\s+)?(?:SQL|query))\s*:\s*',
             '', sql, flags=re.IGNORECASE
         ).strip()
+
+        # Refused even inside a string literal: engines disagree on where literals
+        # end, and a second statement could leave the read-only transaction.
+        sql = re.sub(r'[;\s]+$', '', sql)
+        if not sql:
+            raise ValueError("Empty SQL query generated.")
+        if ";" in sql:
+            logger.warning("Security Alert: Blocked a query with more than one statement.")
+            raise ValueError(
+                "Only one SQL statement can run at a time, and it can't contain ';'."
+            )
 
         try:
             parsed = sqlparse.parse(sql)[0]
@@ -59,7 +77,10 @@ class SQLRunner:
         forbidden_patterns = [
             r"\bDROP\b", r"\bDELETE\b", r"\bTRUNCATE\b", r"\bINSERT\b",
             r"\bUPDATE\b", r"\bGRANT\b", r"\bALTER\b", r"\bEXEC\b", r"\bCREATE\b",
+            r"\bINTO\b",
         ]
+        if db_type == "mssql":
+            forbidden_patterns += self.MSSQL_FORBIDDEN
 
         upper_sql = sql.upper()
 
@@ -114,9 +135,14 @@ class SQLRunner:
                         conn.execute(text("SAVEPOINT intelliquery_safe;"))
                         logger.info("📌 SAVEPOINT created.")
 
-                    result = conn.execute(text(sql))
+                    # Server-side cursor, so only max_rows leave the database
+                    statement = text(sql).execution_options(
+                        stream_results=db_type == "postgres", max_row_buffer=max_rows
+                    )
+                    result = conn.execute(statement)
                     keys = list(result.keys())
                     rows = result.fetchmany(max_rows)
+                    result.close()
                     data = [dict(zip(keys, row)) for row in rows]
 
                     logger.info(f"✅ Query Success. Fetched {len(data)} rows.")
@@ -149,7 +175,7 @@ class SQLRunner:
         """
         Async wrapper for safe SQL execution.
         """
-        cleaned_sql = self.validate_query(sql)
+        cleaned_sql = self.validate_query(sql, connection_model.db_type)
         return await run_in_threadpool(
             self._execute_sync, cleaned_sql, connection_model, max_rows
         )
